@@ -1,19 +1,19 @@
 Origin: TapCore
 Label: TapCore
 Suite: stable
-Version: 1.1.2
+Version: 1.1.3
 Codename: ios
 Architectures: iphoneos-arm64
 Components: main
 Description: TapCore - lightweight Lua automation for rootless iOS
-Date: Thu, 26 Nov 2026 18:13:47 UTC
+Date: Thu, 26 Nov 2026 22:09:54 UTC
 MD5Sum:
- be4ec1773e0dc10865d0f4c94a01072b 1949 Packages
- 8d49890c36c863d208f0e688a6ffb47f 887 Packages.gz
- 5c8d71414c9182827e1c7a086cff7af3 1001 Packages.bz2
- 363128dcdd3a6a67c17eb9a36010997c 964 Packages.xz
+ f00fcee44115ee77d9a90cafa3bc040d 1949 Packages
+ 7c4677e66d35f8c6e363d5005f7bbcdb 885 Packages.gz
+ 9ea458a4aaa3a31643b6142f08643061 1005 Packages.bz2
+ e4d773701067c755f370e737b2b25a6e 972 Packages.xz
 SHA256:
- df42118dc337a24bbee84d316e6b3447c23ebb25d8bac9dfe58846d41062e6bc 1949 Packages
- f47eda4b73acb44d671877c54d8517506bfe89715c2f6c2e4ff4bf4bd36d4458 887 Packages.gz
- 69d78092a9715800e8014ece221ba3eebf19f331ca43c4fc21da0139df5cd992 1001 Packages.bz2
- 40c1c0088b61f4032cda991efbd7f91fe284c4432b9a4c767f92168b944ea410 964 Packages.xz
+ 2f56b5ba77600ff704ab433f030162f89f1f0b9ccca28daf695970d065d6130f 1949 Packages
+ 8e704f980c4a288076afa0894fbae2df50fffc98c12433cb808c6c971f546bc6 885 Packages.gz
+ 10cf4529d5c2befec1788253b4290bfce1c0ad6564d6680757f8b9cd488c6cca 1005 Packages.bz2
+ 5bfa241e14d7d940b447f2daf6b651f61610022f68d7c487eb64464a2425ac71 972 Packages.xz
