@@ -437,10 +437,13 @@ static void handleWebClient(int cfd) {
             } else if ([op isEqualToString:@"home"]) {
                 tapcore_exec_home();
                 sendJSON(cfd, 200, @{@"success": @YES});
-            } else if ([op isEqualToString:@"text"]) {
-                NSString *t = j[@"data"];
-                tapcore_exec_text(t ? t.UTF8String : "");
-                sendJSON(cfd, 200, @{@"success": @YES});
+            } else if ([op isEqualToString:@"text"] || [op isEqualToString:@"copy"]) {
+                NSString *t = [j[@"data"] isKindOfClass:[NSString class]] ? j[@"data"] : @"";
+                const char *u = t.UTF8String;
+                char how[200];
+                BOOL ok = [op isEqualToString:@"copy"] ? tapcore_copy_text(u, strlen(u), how, sizeof(how))
+                                                       : tapcore_exec_text(u, strlen(u), how, sizeof(how));
+                sendJSON(cfd, ok ? 200 : 409, @{@"success": @(ok), @"via": @(how)});
             } else if ([op isEqualToString:@"color"]) {
                 int x = [j[@"x"] intValue], y = [j[@"y"] intValue];
                 uint32_t rgb = tapcore_read_pixel(x, y);

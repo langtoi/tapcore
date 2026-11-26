@@ -57,7 +57,8 @@ TapCore exposes **two HTTP ports** and **a set of native Lua functions**:
 | `POST` | `/api/test` | `{"op":"tap","x":560,"y":1200}` | Tap one point |
 | `POST` | `/api/test` | `{"op":"swipe","x1":950,"y1":1200,"x2":150,"y2":1200,"steps":18}` | Swipe from `(x1,y1)` to `(x2,y2)` |
 | `POST` | `/api/test` | `{"op":"home"}` | Press the Home button |
-| `POST` | `/api/test` | `{"op":"text","data":"hello123"}` | Type text with the hardware HID keyboard |
+| `POST` | `/api/test` | `{"op":"text","data":"hello123"}` | Type text into the focused field (ASCII via the HID keyboard, other text via the foreground app). Returns `{success, via}`; `409` if nothing was typed |
+| `POST` | `/api/test` | `{"op":"copy","data":"some text"}` | Put text on the iPhone clipboard through the foreground app. Returns `{success, via}` (`via` = app that set it); `409` on the home screen |
 | `POST` | `/api/test` | `{"op":"color","x":560,"y":1200}` | Read a pixel color, returns `{color, hex}` |
 
 ### 1.7 Touch recorder (records real taps & swipes)
@@ -110,8 +111,9 @@ Call these from any `.lua` file or through `RUNLUA`.
   - `KEY_TYPE.POWER_BUTTON`
 
 ### Typing & clipboard
-- `inputText(str)` — ASCII strings are typed with the IOKit HID hardware keyboard (works in every app, including password fields); strings with Unicode go through `TapCoreInput.dylib`
-- `copyText(str)` — write to `UIPasteboard` through `TapCoreInput.dylib` in the foreground app
+- `inputText(str)` → `true, how` | `false, reason` — ASCII strings are typed with the IOKit HID hardware keyboard (works in every app, including password fields); other text (Vietnamese, emoji, ...) is inserted by `TapCoreInput.dylib` in the foreground app
+- `copyText(str)` → `true, app` | `false, reason` — put text on the iPhone clipboard (`UIPasteboard`) through `TapCoreInput.dylib` in the foreground app
+  - Needs an app in the foreground (not the home screen). An app that was already open when TapCore was first installed must be relaunched once so it loads `TapCoreInput.dylib`.
 
 ### Screen, colors, OCR & image search
 - `getColor(x, y)` → RGB integer `0xRRGGBB`

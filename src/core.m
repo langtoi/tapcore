@@ -621,34 +621,73 @@ static BOOL isPureASCII(const char *str, size_t len) {
     return YES;
 }
 
+static void copyAckInfo(char *buf, size_t n) {
+    pthread_mutex_lock(&g_ipcLock);
+    strncpy(buf, g_ipcAckInfo, n - 1);
+    buf[n - 1] = '\0';
+    pthread_mutex_unlock(&g_ipcLock);
+}
+
+// Types text into the focused field. Pure ASCII goes through the HID keyboard (works in every
+// app, including password fields and web views). Other text is inserted by TapCoreInput.dylib
+// inside the foreground app. Writes how the text was delivered into `how`; NO = nothing typed.
+BOOL tapcore_exec_text(const char *s, size_t len, char *how, size_t howLen) {
+    if (isPureASCII(s, len)) {
+        typeASCII(s, len);
+        usleep(30000);
+        snprintf(how, howLen, "hid-keyboard");
+        tapcore_log("INP", "inputText(%zu) via HID keyboard", len);
+        return YES;
+    }
+    if (dispatchTweakCommand("input", s, len, 320)) {
+        char info[160];
+        copyAckInfo(info, sizeof(info));
+        snprintf(how, howLen, "%s", info);
+        tapcore_log("INP", "inputText(%zu) via %s", len, info);
+        return YES;
+    }
+    snprintf(how, howLen, "no foreground app answered");
+    tapcore_log("INP", "inputText(%zu) failed: no foreground app answered "
+                "(home screen, or app opened before TapCore was installed)", len);
+    return NO;
+}
+
+// Sets the general pasteboard through TapCoreInput.dylib in the foreground app
+// (the daemon itself is not allowed to write the pasteboard).
+BOOL tapcore_copy_text(const char *s, size_t len, char *how, size_t howLen) {
+    if (dispatchTweakCommand("copy", s, len, 350)) {
+        char info[160];
+        copyAckInfo(info, sizeof(info));
+        snprintf(how, howLen, "%s", info);
+        tapcore_log("INP", "copyText(%zu) via %s", len, info);
+        return YES;
+    }
+    snprintf(how, howLen, "no foreground app answered");
+    tapcore_log("INP", "copyText(%zu) failed: no foreground app answered "
+                "(home screen, or app opened before TapCore was installed)", len);
+    return NO;
+}
+
+// inputText(str) -> true, how | false, reason
 static int l_inputText(lua_State *L) {
     size_t len = 0;
     const char *s = luaL_checklstring(L, 1, &len);
-    // Pure ASCII: always type directly via hardware IOKit HID keyboard (100% reliable across all apps, Password fields, WebViews, Spotlight)
-    if (isPureASCII(s, len)) {
-        tapcore_log("INP", "inputText(%zu) via HID keyboard", len);
-        typeASCII(s, len);
-        usleep(30000);
-        return 0;
-    }
-    // Non-ASCII (Unicode/emoji): deliver via TapCoreInput.dylib UIKeyInput firstResponder
-    if (dispatchTweakCommand("input", s, len, 320)) {
-        tapcore_log("INP", "inputText(%zu) Unicode via tweak [%s]", len, g_ipcAckInfo);
-        return 0;
-    }
-    tapcore_log("INP", "inputText(%zu) Unicode tweak no-ack -> ASCII fallback", len);
-    typeASCII(s, len);
-    return 0;
+    char how[200];
+    BOOL ok = tapcore_exec_text(s, len, how, sizeof(how));
+    lua_pushboolean(L, ok);
+    lua_pushstring(L, how);
+    return 2;
 }
 
+// copyText(str) -> true, app | false, reason
 static int l_copyText(lua_State *L) {
     size_t len = 0;
     const char *s = luaL_checklstring(L, 1, &len);
-    BOOL ok = dispatchTweakCommand("copy", s, len, 350);
-    if (!ok) {
-        fprintf(stderr, "[tapcore] copyText: no active UIKit app ACKed (app in background or SpringBoard)\n");
-    }
-    return 0;
+    char how[200];
+    BOOL ok = tapcore_copy_text(s, len, how, sizeof(how));
+    lua_pushboolean(L, ok);
+    lua_pushstring(L, how);
+    return 2;
 }
 
 static int l_getColor(lua_State *L) {
@@ -1699,18 +1738,7 @@ void tapcore_exec_home(void) {
     usleep(50000);
 }
 
-void tapcore_exec_text(const char *utf8) {
-    if (!utf8) return;
-    size_t len = strlen(utf8);
-    if (isPureASCII(utf8, len)) {
-        typeASCII(utf8, len);
-        usleep(30000);
-        return;
-    }
-    if (!dispatchTweakCommand("input", utf8, len, 320)) {
-        typeASCII(utf8, len);
-    }
-}
+
 
 // ---------------- Touch Recorder (IOKit HID Callback) ----------------
 static pthread_mutex_t g_recLock = PTHREAD_MUTEX_INITIALIZER;

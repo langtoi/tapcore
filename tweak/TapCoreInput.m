@@ -202,8 +202,10 @@ static void handleTapCoreCommand(void) {
             if ([opStr isEqualToString:@"copy"]) {
                 g_lastSeq = seq;
                 [UIPasteboard generalPasteboard].string = text;
+                NSString *info = [NSString stringWithFormat:@"%@/pasteboard",
+                                  [NSBundle mainBundle].bundleIdentifier ?: @"?"];
                 dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0), ^{
-                    sendAck(seq, "COPY_OK");
+                    sendAck(seq, info.UTF8String);
                 });
             } else if ([opStr isEqualToString:@"input"]) {
                 NSString *how = performInsertText(text);

@@ -26,8 +26,9 @@ end
 -- TapCore dispatches touch events immediately; the short settle after touchUp only gives
 -- the app time to handle the tap before the next request.
 ----------------------------------------------------------------
+local TAP_HOLD_US     = 40000   -- finger-down time of a tap (a real tap lasts 40-120 ms)
 local TOUCH_SETTLE_US = 50000
-local POLL_INTERVAL_S = 0.03   -- pause between two color checks
+local POLL_INTERVAL_S = 0.03    -- pause between two color checks
 
 -- Text search (Vision OCR). Measured on iPhone X: a Fast pass takes ~0.1 s, an Accurate pass
 -- ~2-4 s whatever the region size. So text search runs Fast passes, and only when Fast keeps
@@ -36,10 +37,15 @@ local OCR_INTERVAL_S       = 0.08  -- pause between two Fast passes
 local OCR_ACCURATE_AFTER_S = 1.5   -- Fast must have missed this long before an Accurate pass
 local OCR_ACCURATE_GAP_S   = 6     -- at most one Accurate pass per this many seconds
 local ocrAccurateCost      = 3.5   -- seconds; updated from the last Accurate pass
+-- Fast OCR sees text as soon as it is drawn, often while the screen is still animating in and
+-- the app ignores touches. Before tapping, the text must still be found at the same spot
+-- (within OCR_SETTLE_PX) at least OCR_SETTLE_S after it was first seen.
+local OCR_SETTLE_S         = 0.25
+local OCR_SETTLE_PX        = 12
 
 local function tap(x, y)
     touchDown(0, x, y)
-    usleep(16000)
+    usleep(TAP_HOLD_US)
     touchUp(0, x, y)
     usleep(TOUCH_SETTLE_US)
 end
@@ -690,8 +696,9 @@ local function processCommand(client, data, action)
         ok = pcall(openURL, payload)
         res.message = ok and "URL opened" or "URL failed"
     elseif action == "TEXT" then
-        ok = pcall(inputText, payload)
-        res.message = ok and "Text input" or "Text failed"
+        local called, typed, how = pcall(inputText, payload)
+        ok = called and typed ~= false
+        res.message = ok and "Text input" or ("Text failed: " .. tostring(how or typed))
     else -- RUNLUA
         ok, result = pcall(function()
             local fn, compileError = load(payload)
@@ -754,8 +761,11 @@ local function processSearch(client, data)
         -- "fast" / "accurate" force one level for every pass.
         local mode = type(data.level) == "string" and data.level:lower() or "auto"
         local started, lastAccurate = now(), -math.huge
+        local willTouch = data.action == "hold" or
+            (type(data.action) == "string" and data.action:match("^click%d*$") ~= nil)
 
-        local hit = poll(timeout, function(deadline)
+        -- One OCR pass: returns {x, y} of the target or nil, plus the level used.
+        local function locate(deadline)
             local level = mode
             if level ~= "fast" and level ~= "accurate" then
                 local t = now()
@@ -770,7 +780,7 @@ local function processSearch(client, data)
             local ok, results = pcall(ocr, {level = level, languages = {"en-US"},
                 correct = (level == "accurate"), region = region})
             if ok and level == "accurate" then ocrAccurateCost = math.max(1, now() - t0) end
-            if not ok or type(results) ~= "table" then return nil end
+            if not ok or type(results) ~= "table" then return nil, level end
             for _, item in ipairs(results) do
                 local text = item.text or ""
                 local candidate = trim(text):lower():gsub("%s+", "")
@@ -791,11 +801,33 @@ local function processSearch(client, data)
                     else
                         x = (r.topLeft.x + r.topRight.x) / 2
                     end
-                    return {x + dx, (r.topLeft.y + r.bottomLeft.y) / 2 + dy}
+                    return {x + dx, (r.topLeft.y + r.bottomLeft.y) / 2 + dy}, level
                 end
+            end
+            return nil, level
+        end
+
+        local seen   -- {x, y, t}: where and when the text was first seen at its current spot
+        local hit = poll(timeout, function(deadline)
+            local pos, level = locate(deadline)
+            if not pos then
+                seen = nil
+                return nil
+            end
+            -- "check" never touches; an Accurate pass already took seconds: no settle needed.
+            if not willTouch or level == "accurate" then return pos end
+            local t = now()
+            if not seen or math.abs(pos[1] - seen[1]) > OCR_SETTLE_PX
+                or math.abs(pos[2] - seen[2]) > OCR_SETTLE_PX then
+                seen = {pos[1], pos[2], t}
+                return nil
+            end
+            if t - seen[3] >= OCR_SETTLE_S or deadline - t <= OCR_INTERVAL_S then
+                return pos
             end
             return nil
         end, OCR_INTERVAL_S)
+        if not hit and seen then hit = {seen[1], seen[2]} end   -- found but timed out while settling
         if not hit then return fail(client, 404, "Not found") end
         performAction(hit[1], hit[2], data.action)
         return respond(client, 200, string.format('{"success":true,"x":%f,"y":%f}', hit[1], hit[2]))
