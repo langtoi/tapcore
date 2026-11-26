@@ -1,13 +1,27 @@
 #!/usr/bin/env bash
 # Build TapCore for rootless iOS (arm64) and package it as a .deb.
-# Run from Windows:  wsl bash -lc 'bash /mnt/d/CHUNG_CHUNG/AUTO/tapcore/build.sh'
+#
+#   Linux / WSL:  needs Theos in /opt/theos (toolchain + iPhoneOS16.5.sdk), ldid, dpkg-deb
+#   macOS (CI):   needs Xcode, ldid, dpkg; set TAPCORE_SDK to an iPhoneOS16.5.sdk from theos/sdks
+#
+# Usage, from the repo root:  bash build.sh
 set -euo pipefail
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
-SDK="/opt/theos/sdks/iPhoneOS16.5.sdk"
-TOOLCHAIN="/opt/theos/toolchain/linux/iphone/bin"
-CLANG="$TOOLCHAIN/clang"
 VERSION="$(tr -d ' \r\n' < "$DIR/VERSION")"
+
+if [ "$(uname -s)" = "Darwin" ]; then
+  CLANG="$(xcrun --find clang)"
+  SDK="${TAPCORE_SDK:?Set TAPCORE_SDK to an iPhoneOS16.5.sdk directory (theos/sdks)}"
+  TOOLCHAIN_FLAGS=()
+  PLATFORM_FLAGS=()            # Apple ld derives the platform version from -target and the SDK
+else
+  TOOLCHAIN="/opt/theos/toolchain/linux/iphone/bin"
+  CLANG="$TOOLCHAIN/clang"
+  SDK="${TAPCORE_SDK:-/opt/theos/sdks/iPhoneOS16.5.sdk}"
+  TOOLCHAIN_FLAGS=(-B"$TOOLCHAIN")
+  PLATFORM_FLAGS=(-Wl,-platform_version,ios,15.0,16.5)
+fi
 
 LUA_SRC="$DIR/third_party/lua-5.3.6/src"
 BUILD="$DIR/build"
@@ -20,7 +34,7 @@ if [ ! -f "$LUA_SRC/lapi.c" ]; then
 fi
 
 COMMON_FLAGS=(
-  -B"$TOOLCHAIN"
+  ${TOOLCHAIN_FLAGS[@]+"${TOOLCHAIN_FLAGS[@]}"}
   -target arm64-apple-ios15.0
   -arch arm64
   -miphoneos-version-min=15.0
@@ -52,7 +66,7 @@ fi
 
 echo "[2/5] Building tapcore daemon..."
 "$CLANG" "${COMMON_FLAGS[@]}" \
-  -Wl,-platform_version,ios,15.0,16.5 \
+  ${PLATFORM_FLAGS[@]+"${PLATFORM_FLAGS[@]}"} \
   -fobjc-arc \
   -I"$LUA_SRC" \
   -I"$DIR/src" \
@@ -78,7 +92,7 @@ ldid -S"$DIR/entitlements.plist" "$BUILD/tapcore"
 echo "[3/5] Building TapCoreInput.dylib..."
 "$CLANG" "${COMMON_FLAGS[@]}" \
   -dynamiclib \
-  -Wl,-platform_version,ios,15.0,16.5 \
+  ${PLATFORM_FLAGS[@]+"${PLATFORM_FLAGS[@]}"} \
   -Wl,-install_name,/var/jb/Library/MobileSubstrate/DynamicLibraries/TapCoreInput.dylib \
   -fobjc-arc \
   -framework Foundation \
@@ -90,7 +104,7 @@ ldid -S "$BUILD/TapCoreInput.dylib"
 
 echo "[4/5] Building TapCore.app..."
 "$CLANG" "${COMMON_FLAGS[@]}" \
-  -Wl,-platform_version,ios,15.0,16.5 \
+  ${PLATFORM_FLAGS[@]+"${PLATFORM_FLAGS[@]}"} \
   -fobjc-arc \
   -framework Foundation \
   -framework UIKit \
@@ -103,7 +117,7 @@ cp "$DIR/app/AppIcon60x60@2x.png" "$DIR/app/AppIcon60x60@3x.png" "$APP/"
 ldid -S"$DIR/app/entitlements.plist" "$APP/TapCore"
 
 echo "[5/5] Packaging com.tapcore_${VERSION}_iphoneos-arm64.deb..."
-# Stage on the Linux filesystem: /mnt/d (NTFS) cannot hold the 0755/0644 modes dpkg-deb requires.
+# Stage in a temp dir: a Windows drive mounted in WSL (NTFS) cannot hold the 0755/0644 modes dpkg-deb requires.
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
 chmod 0755 "$STAGE"
@@ -121,11 +135,11 @@ install -m 0644 "$DIR/web/index.html"                    "$JB/usr/share/tapcore/
 install -m 0644 "$DIR/scripts/sv.lua"                    "$JB/usr/share/tapcore/sv.lua"
 
 for s in preinst postinst prerm; do
-  sed 's/\r$//' "$DIR/packaging/$s" > "$STAGE/DEBIAN/$s"
+  tr -d '\r' < "$DIR/packaging/$s" > "$STAGE/DEBIAN/$s"
   chmod 0755 "$STAGE/DEBIAN/$s"
 done
 INSTALLED_KB="$(du -sk "$STAGE/var" | cut -f1)"
-sed -e 's/\r$//' -e "s/@VERSION@/$VERSION/" "$DIR/packaging/control" > "$STAGE/DEBIAN/control"
+tr -d '\r' < "$DIR/packaging/control" | sed "s/@VERSION@/$VERSION/" > "$STAGE/DEBIAN/control"
 echo "Installed-Size: $INSTALLED_KB" >> "$STAGE/DEBIAN/control"
 chmod 0644 "$STAGE/DEBIAN/control"
 

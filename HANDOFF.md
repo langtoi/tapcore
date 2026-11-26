@@ -18,7 +18,8 @@ TapCore is the new name of the project previously called `ghost-atd` / GhostStud
 ---
 
 ## 2. Build environment & test device
-- **Build:** Windows + WSL Ubuntu with `/opt/theos` (`clang` LLVM-19, `ld64.lld`, `/opt/theos/sdks/iPhoneOS16.5.sdk`, `ldid`, `dpkg-deb`, `dpkg-scanpackages`).
+- **CI build:** GitHub Actions `macos-15` with Xcode clang, `iPhoneOS16.5.sdk` from `theos/sdks`, `ldid` and `dpkg` from Homebrew.
+- **Local build:** Linux/WSL with `/opt/theos` (`clang` LLVM-19, `ld64.lld`, `/opt/theos/sdks/iPhoneOS16.5.sdk`, `ldid`, `dpkg-deb`).
 - **Test device:** iPhone X (`iPhone10,3`, `1125×2436`), **iOS 16.7.12** (`20H364`), **rootless** jailbreak (`/var/jb`, Dopamine/Procursus).
   - The shell on the device is `/var/jb/bin/sh` (**there is no `/bin/sh`**).
   - Device IPs and SSH passwords are not stored in the repo; `tools/deploy_verify.py` reads the password from `TAPCORE_SSH_PASS` or prompts for it.
@@ -29,6 +30,7 @@ TapCore is the new name of the project previously called `ghost-atd` / GhostStud
 
 ```text
 tapcore/
+├── .github/workflows/release.yml  # CI: build on macOS and publish to the Sileo repo on every push
 ├── VERSION                   # Package version (.deb and Sileo repo)
 ├── build.sh                  # Build Lua objects, daemon, dylib, app, then package the .deb
 ├── entitlements.plist        # Private entitlements for the daemon (HID, IOSurface, QuartzCore, Photos)
@@ -71,18 +73,14 @@ tapcore/
 
 ## 4. Build, release & install
 
-```bash
-# 1. Build + package the .deb (WSL)
-wsl bash -lc 'bash /mnt/d/CHUNG_CHUNG/AUTO/tapcore/build.sh'
+Releases are automated by `.github/workflows/release.yml`:
 
-# 2. Refresh the Sileo repo in docs/
-wsl bash -lc 'bash /mnt/d/CHUNG_CHUNG/AUTO/tapcore/tools/make_repo.sh'
+1. Every push to `main` that touches the code (`src/`, `tweak/`, `app/`, `web/`, `scripts/`, `packaging/`, `build.sh`, `VERSION`, ...) starts the **Build & publish** workflow on a `macos-15` runner.
+2. The runner installs `ldid`, `dpkg`, `xz` with Homebrew, fetches `iPhoneOS16.5.sdk` from `theos/sdks`, then runs `build.sh` (Xcode clang) and `tools/make_repo.sh`.
+3. It commits `VERSION` and `docs/` back as `Release TapCore x.y.z` and asks GitHub Pages to rebuild.
 
-# 3. Commit + push: GitHub Pages serves docs/ and Sileo sees the new version
-git add -A && git commit -m "TapCore x.y.z" && git push
-```
-
-- **New release:** bump `VERSION`, then repeat the three steps.
+- **Versioning:** bump `VERSION` for a minor/major release; if the current version is already published, the workflow bumps the patch number itself. Pull afterwards to get the release commit.
+- **Local build (Linux/WSL with Theos), from the repo root:** `bash build.sh && bash tools/make_repo.sh`, then commit and push.
 - **Install on an iPhone:** Sileo → Sources → add `https://langtoi.github.io/tapcore/` → install **TapCore**.
 - **Quick dev install on one device over SSH:** `python tools\deploy_verify.py <iphone-ip>`.
 - `preinst` removes the old `ghost-atd` install (daemon `com.ghost.atd`, `ghost_input.dylib`, `GhostStudio.app`) and migrates `config.json` to the TapCore folder.
@@ -100,7 +98,7 @@ git add -A && git commit -m "TapCore x.y.z" && git push
 8. **Rootless shell:** there is no `/bin/sh`, so `execute()` uses `fork/execl` with `/var/jb/bin/sh`; `loslib.c` is patched at build time to replace `system()` with `tapcore_ios_system()`. Package maintainer scripts use the `#!/var/jb/bin/sh` shebang.
 9. **`appKill`:** `BKSTerminateApplication...` + look up `CFBundleExecutable` via `LSApplicationProxy`, then `killall -9`.
 10. **Linking Lua with `ld64.lld`:** do not archive `liblua.a` with GNU `ar` (no Mach-O symbol index); link `build/lua_obj/*.o` directly.
-11. **Packaging:** stage the `.deb` on the Linux filesystem (`mktemp -d`), because `/mnt/d` (NTFS) cannot hold the 0755/0644 modes `dpkg-deb` requires.
+11. **Packaging:** stage the `.deb` on the Linux filesystem (`mktemp -d`), because a Windows drive mounted in WSL (NTFS) cannot hold the 0755/0644 modes `dpkg-deb` requires.
 
 ---
 

@@ -30,14 +30,19 @@ After installing:
 
 ## Build & release (developers)
 
-Requires Windows + WSL Ubuntu with Theos (`/opt/theos`, iPhoneOS16.5 SDK) and `dpkg-dev`.
+Releases are built by GitHub Actions ([.github/workflows/release.yml](.github/workflows/release.yml)):
+
+1. Change the code and push to `main` (editing on github.com works too).
+2. A macOS runner builds the `.deb`, refreshes the Sileo repo in `docs/` and commits it back as `Release TapCore x.y.z`.
+3. GitHub Pages publishes it; Sileo offers the update on the next refresh.
+
+If `VERSION` was not bumped, the workflow increases the patch number itself. Run `git pull` afterwards to get the release commit. The workflow can also be started by hand from the **Actions** tab (**Build & publish** → **Run workflow**).
+
+Building locally is still possible from the repo root, in Linux/WSL with Theos (`/opt/theos`, iPhoneOS16.5 SDK) and `dpkg-dev`:
 
 ```bash
-wsl bash -lc 'bash /mnt/d/CHUNG_CHUNG/AUTO/tapcore/build.sh'          # build + .deb
-wsl bash -lc 'bash /mnt/d/CHUNG_CHUNG/AUTO/tapcore/tools/make_repo.sh' # refresh the Sileo repo in docs/
-git add -A && git commit -m "TapCore x.y.z" && git push                # GitHub Pages publishes it
+bash build.sh             # build + .deb in build/
+bash tools/make_repo.sh   # refresh the Sileo repo in docs/
 ```
-
-Bump the number in `VERSION` before each release so Sileo offers the update.
 
 > Ports 8080 and 3000 have no authentication and the daemon runs as root: use TapCore on a trusted LAN only.
