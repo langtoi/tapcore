@@ -576,7 +576,17 @@ static void *webServerAcceptLoop(void *arg) {
     return NULL;
 }
 
-static int bindPort(int port) {
+static void startAcceptThread(int fd) {
+    pthread_t th;
+    if (pthread_create(&th, NULL, webServerAcceptLoop, (void *)(intptr_t)fd) == 0) {
+        pthread_detach(th);
+    } else {
+        close(fd);
+    }
+}
+
+// Listening socket on addr:port (network byte order address), or -1.
+static int bindAddress(in_addr_t addrNet, int port) {
     int fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd < 0) return -1;
     int opt = 1;
@@ -587,7 +597,7 @@ static int bindPort(int port) {
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
     addr.sin_port = htons((uint16_t)port);
-    addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    addr.sin_addr.s_addr = addrNet;
 
     if (bind(fd, (struct sockaddr *)&addr, sizeof(addr)) != 0 || listen(fd, 64) != 0) {
         close(fd);
@@ -596,32 +606,69 @@ static int bindPort(int port) {
     return fd;
 }
 
-int tapcore_web_start(int preferredPort, int fallbackPort) {
-    int srv = bindPort(preferredPort);
-    int chosen = preferredPort;
-    if (srv < 0 && fallbackPort > 0 && fallbackPort != preferredPort) {
-        tapcore_log("WEB", "Port %d busy, trying fallback port %d", preferredPort, fallbackPort);
-        srv = bindPort(fallbackPort);
-        chosen = fallbackPort;
-    }
-    if (srv < 0) {
-        tapcore_log("ERR", "Could not bind web port %d or %d", preferredPort, fallbackPort);
-        return -1;
-    }
-    g_activeWebPort = chosen;
-
-    // Record active port for TapCore.app local discovery
-    FILE *fp = fopen(TAPCORE_PORT_FILE, "w");
+static void announcePort(const char *how) {
+    if (g_activeWebPort == TAPCORE_WEB_PORT) return;
+    g_activeWebPort = TAPCORE_WEB_PORT;
+    FILE *fp = fopen(TAPCORE_PORT_FILE, "w");      // read by TapCore.app
     if (fp) {
-        fprintf(fp, "%d\n", chosen);
+        fprintf(fp, "%d\n", TAPCORE_WEB_PORT);
         fclose(fp);
     }
+    tapcore_log("WEB", "TapCore Web Server listening on http://%s:%d (%s)",
+                localWiFiIP().UTF8String, TAPCORE_WEB_PORT, how);
+}
 
-    tapcore_log("WEB", "TapCore Web Server listening on http://%s:%d",
-              localWiFiIP().UTF8String, chosen);
+// Serves TAPCORE_WEB_PORT (8080). Normally one socket on all addresses. If another server
+// already holds 0.0.0.0:8080, binds every local IPv4 address individually instead: the kernel
+// hands a connection to the most specific binding, so requests to the iPhone's IP (and to
+// 127.0.0.1 from TapCore.app) reach TapCore. Addresses are re-scanned every 3 s so a new
+// Wi-Fi IP is picked up after a reconnect.
+static void *webServerStartLoop(void *arg) {
+    (void)arg;
+    int fd = bindAddress(htonl(INADDR_ANY), TAPCORE_WEB_PORT);
+    if (fd >= 0) {
+        announcePort("all addresses");
+        webServerAcceptLoop((void *)(intptr_t)fd);
+        return NULL;
+    }
+    tapcore_log("WEB", "0.0.0.0:%d is held by another server; binding each local address instead",
+                TAPCORE_WEB_PORT);
 
+    NSMutableSet<NSNumber *> *bound = [NSMutableSet set];
+    BOOL warned = NO;
+    for (;;) {
+        @autoreleasepool {
+            struct ifaddrs *ifaddr = NULL;
+            if (getifaddrs(&ifaddr) == 0) {
+                for (struct ifaddrs *ifa = ifaddr; ifa; ifa = ifa->ifa_next) {
+                    if (!ifa->ifa_addr || ifa->ifa_addr->sa_family != AF_INET) continue;
+                    in_addr_t a = ((struct sockaddr_in *)ifa->ifa_addr)->sin_addr.s_addr;
+                    NSNumber *key = @(a);
+                    if ([bound containsObject:key]) continue;
+                    int afd = bindAddress(a, TAPCORE_WEB_PORT);
+                    if (afd < 0) continue;
+                    [bound addObject:key];
+                    startAcceptThread(afd);
+                    char ip[INET_ADDRSTRLEN] = {0};
+                    inet_ntop(AF_INET, &((struct sockaddr_in *)ifa->ifa_addr)->sin_addr, ip, sizeof(ip));
+                    tapcore_log("WEB", "Listening on %s:%d (%s)", ip, TAPCORE_WEB_PORT, ifa->ifa_name);
+                }
+                freeifaddrs(ifaddr);
+            }
+            if (bound.count > 0) {
+                announcePort("per-address, port shared");
+            } else if (!warned) {
+                tapcore_log("ERR", "Port %d is not available on any address; retrying", TAPCORE_WEB_PORT);
+                warned = YES;
+            }
+        }
+        sleep(3);
+    }
+    return NULL;
+}
+
+void tapcore_web_start(void) {
     pthread_t th;
-    pthread_create(&th, NULL, webServerAcceptLoop, (void *)(intptr_t)srv);
+    pthread_create(&th, NULL, webServerStartLoop, NULL);
     pthread_detach(th);
-    return 0;
 }

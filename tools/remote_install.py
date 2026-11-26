@@ -16,7 +16,7 @@ import time
 import urllib.error
 import urllib.request
 
-PORTS = (8080, 8088)
+PORTS = (8080, 8088)   # 8088: daemons before 1.1.2 that fell back when 8080 was busy
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEB_NAME = '_tapcore_install.deb'
 LUA_NAME = '_tapcore_install.lua'

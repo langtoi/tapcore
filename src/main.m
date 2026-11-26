@@ -31,13 +31,7 @@ int main(int argc, char *argv[]) {
         tapcore_core_start_ipc();
         tapcore_runner_load_config();
 
-        NSDictionary *cfg = tapcore_runner_get_config();
-        int webPort = [cfg[@"web_port"] intValue] ?: 8080;
-        int fbPort  = [cfg[@"fallback_port"] intValue] ?: 8088;
-
-        if (tapcore_web_start(webPort, fbPort) != 0) {
-            tapcore_log("ERR", "Failed to start Web Studio HTTP server");
-        }
+        tapcore_web_start();   // port 8080, retried until free
 
         // Optional CLI argument: run a specific script immediately
         const char *cliScript = NULL;

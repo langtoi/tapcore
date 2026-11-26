@@ -19,7 +19,7 @@ Or open https://langtoi.github.io/tapcore/ on the iPhone and tap the add-source 
 
 After installing:
 - The **TapCore** app appears on the Home Screen.
-- Web Studio: `http://<iphone-ip>:8080` (switches to `8088` when `8080` is busy).
+- Web Studio: `http://<iphone-ip>:8080`.
 - Lua scripts live in `/var/jb/var/mobile/Library/TapCore/Scripts/`.
 - An older `ghost-atd` / GhostStudio install is removed automatically.
 

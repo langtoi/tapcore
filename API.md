@@ -2,14 +2,14 @@
 
 TapCore exposes **two HTTP ports** and **a set of native Lua functions**:
 
-- **Web / Control port (`:8080`, falls back to `:8088` when `:8080` is busy):** always served by the `tapcore` daemon (script management, screen capture, crop, OCR, touch recording, tap/type tests).
+- **Web / Control port (`:8080`):** always served by the `tapcore` daemon (script management, screen capture, crop, OCR, touch recording, tap/type tests).
 - **`sv.lua` port (`:3000`):** open while the `sv.lua` script is running (fully compatible with the BAS client).
 
 > The active web port is written to `/tmp/tapcore.port` on the iPhone and shown on the home screen of the **TapCore** app.
 
 ---
 
-## Part 1 — Control & Studio REST API (`http://<IP>:8080` or `:8088`)
+## Part 1 — Control & Studio REST API (`http://<IP>:8080`)
 
 ### 1.1 Script control (used by BAS)
 | Method | Endpoint | Description |
@@ -22,7 +22,7 @@ TapCore exposes **two HTTP ports** and **a set of native Lua functions**:
 |---|---|---|---|
 | `GET` | `/` | — | Open the **TapCore Web Studio** in a browser |
 | `GET` | `/api/status` | — | JSON: `version`, `daemon_started`, `memory_mb`, `ip`, `web_port`, `running`, `script`, `uptime_s`, `last_error`, `screen_w`, `screen_h`, `sender_id`, `recording`, `record_events`, `auto_start_script`, `scripts_dir` |
-| `POST` | `/api/config` | `{"auto_start_script":"sv.lua","web_port":8080,"fallback_port":8088,"scripts_dir":"..."}` | Update the configuration (set `"auto_start_script":""` to disable auto-start at boot) |
+| `POST` | `/api/config` | `{"auto_start_script":"sv.lua","scripts_dir":"..."}` | Update the configuration (set `"auto_start_script":""` to disable auto-start at boot) |
 
 ### 1.3 Live console log
 | Method | Endpoint | Description |

@@ -39,7 +39,7 @@ tapcore/
 │   ├── tapcore.h             # Shared header (paths, version, internal API)
 │   ├── core.m                # 21 native APIs: IOKit HID touch/key/recorder, CARenderServer, OCR engine, findImage, IPC :3001, logger
 │   ├── runner.m              # Multi-script runner (instant Stop via lua_sethook), config.json, status, print() -> Live Console
-│   ├── web.m                 # HTTP server :8080 (fallback :8088), REST API, /control/*, /api/system
+│   ├── web.m                 # HTTP server :8080, REST API, /control/*, /api/system
 │   ├── lua_socket.m          # Socket module on POSIX sockets: buffered reads, interruptible poll()
 │   ├── lua_json.m            # json module on NSJSONSerialization
 │   └── main.m                # Entry point: raise Jetsam to 512 MB, IPC, config, web server, auto-start
@@ -121,4 +121,4 @@ Releases are automated by `.github/workflows/release.yml`:
 - Lua `io.popen` still calls `/bin/sh` and fails on rootless; use `execute()` instead.
 - `usleep` is capped at 60 seconds per call; `findImage` returns only one match.
 - The Sileo repo is unsigned (no `Release.gpg` / `InRelease`).
-- If another service holds `:8080`, TapCore runs on `:8088`.
+- The web server only uses `:8080`. If another server already holds `0.0.0.0:8080` (e.g. another automation framework), TapCore binds `8080` on each local IPv4 address instead (Wi-Fi IP, `127.0.0.1`, ...). The kernel delivers a connection to the most specific binding, so BAS requests to the iPhone's IP reach TapCore without removing the other server. Addresses are re-scanned every 3 s to follow Wi-Fi IP changes.

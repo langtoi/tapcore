@@ -8,6 +8,7 @@
 #define TAPCORE_CONFIG_FILE  "/var/jb/var/mobile/Library/TapCore/config.json"
 #define TAPCORE_SCRIPTS_DIR  "/var/jb/var/mobile/Library/TapCore/Scripts"
 #define TAPCORE_PORT_FILE    "/tmp/tapcore.port"
+#define TAPCORE_WEB_PORT     8080
 
 #ifndef TAPCORE_VERSION
 #define TAPCORE_VERSION "dev"   // build.sh passes the VERSION file
@@ -63,7 +64,7 @@ int           tapcore_runner_stop(void);
 NSDictionary *tapcore_runner_status(void);
 void          tapcore_runner_autostart_if_configured(void);
 
-int  tapcore_web_start(int preferredPort, int fallbackPort);
+void tapcore_web_start(void);
 int  tapcore_web_active_port(void);
 
 // Lua preloaded modules

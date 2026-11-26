@@ -34,9 +34,6 @@ void tapcore_runner_load_config(void) {
         ensureDir(TAPCORE_WEB_DIR);
 
         NSMutableDictionary *def = [@{
-            @"web_port": @(8080),
-            @"fallback_port": @(8088),
-            @"web_enabled": @YES,
             @"auto_start_script": @"",
             @"scripts_dir": @TAPCORE_SCRIPTS_DIR
         } mutableCopy];
@@ -46,6 +43,7 @@ void tapcore_runner_load_config(void) {
             id obj = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
             if ([obj isKindOfClass:[NSDictionary class]]) {
                 [def addEntriesFromDictionary:(NSDictionary *)obj];
+                [def removeObjectsForKeys:@[@"web_port", @"fallback_port", @"web_enabled"]];   // port is fixed to 8080
             }
         }
         NSString *cfgDir = def[@"scripts_dir"];
@@ -79,7 +77,7 @@ BOOL tapcore_runner_update_config(NSDictionary *patch) {
     @autoreleasepool {
         pthread_mutex_lock(&g_runnerLock);
         if (!g_config) g_config = [NSMutableDictionary dictionary];
-        for (NSString *k in @[@"web_port", @"fallback_port", @"web_enabled", @"auto_start_script", @"scripts_dir"]) {
+        for (NSString *k in @[@"auto_start_script", @"scripts_dir"]) {
             if (patch[k] != nil && patch[k] != [NSNull null]) {
                 g_config[k] = patch[k];
             }
