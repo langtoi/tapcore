@@ -22,7 +22,7 @@ SHA256: cdfd24559e54dd15fecc4d401e14bc4efd825a9c4caf8c5567ce2112548e032a
 
 Package: com.tapcore
 Name: TapCore
-Version: 1.1.0
+Version: 1.1.2
 Architecture: iphoneos-arm64
 Description: Lightweight Lua automation runtime for rootless iOS 15-16: HID touch/keys, screen color, fast Vision OCR, findImage, touch recorder, web studio and app.
 Maintainer: langtoi
@@ -32,10 +32,10 @@ Depends: firmware (>= 15.0)
 Homepage: https://github.com/langtoi/tapcore
 Icon: https://langtoi.github.io/tapcore/icon-512.png
 Depiction: https://langtoi.github.io/tapcore/
-Installed-Size: 692
-Filename: debs/com.tapcore_1.1.0_iphoneos-arm64.deb
-Size: 243896
-MD5sum: 6ca474e651ba80bc345b35b529cbc5b7
-SHA1: 9252f35d5af985c6a2254432f6675cb79140127c
-SHA256: 27d526d1a7316c72bfcf798aee48b68c06f490747b12e53ebb844df29d135430
+Installed-Size: 696
+Filename: debs/com.tapcore_1.1.2_iphoneos-arm64.deb
+Size: 245362
+MD5sum: 5b2770b5d62ee1e4bb51c4c93f5c0e36
+SHA1: 30a927a0476b36acabee02bb815bec54ebb74246
+SHA256: 62954ea60ebdbad775545afb8865d7dac4c221aac2faf8cb6fdbc1e9e87f7d1b
 
