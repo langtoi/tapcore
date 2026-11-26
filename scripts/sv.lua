@@ -1,19 +1,19 @@
 ----------------------------------------------------------------
--- AutoTouch HTTP server (port 3000) - ban gon
--- Client BAS (X.xml / X2.xml) chi dung:
+-- AutoTouch-compatible HTTP server (port 3000) - compact version
+-- The BAS client (X.xml / X2.xml) only uses:
 --   RUNLUA, URL, TEXT                    -> processCommand
 --   COLOR / findColor (+ script)         -> processColor
---   POINTS (diem goc + diem neo)         -> processPoints
+--   POINTS (base point + anchor points)  -> processPoints
 --   text / image_path (check/click/clickN/hold) -> processSearch
 --   header X-Action: SAVE_PHOTO          -> processSavePhoto
---   {"action": "STOP"}                   -> tra 200 roi tat server (de tat tu xa)
--- Client chi doc HTTP status (200 / 404 / 4xx / 500).
+--   {"action": "STOP"}                   -> reply 200, then shut the server down (remote stop)
+-- The client only reads the HTTP status (200 / 404 / 4xx / 500).
 ----------------------------------------------------------------
 local socket = require("socket")
 local json   = require("json")
 
 local PORT        = 3000
-local IDLE_EXIT_S = 1800   -- tu tat sau 30 phut khong co request (0 = chay mai)
+local IDLE_EXIT_S = 1800   -- exit after 30 minutes without requests (0 = run forever)
 local DEBUG_MODE  = false
 local now         = socket.gettime or os.time
 
@@ -22,10 +22,10 @@ local function trim(s)
 end
 
 ----------------------------------------------------------------
--- CHAM MAN HINH
--- QUAN TRONG: AutoTouch chi day touchUp ra man hinh khi script goi usleep.
--- Thieu usleep sau touchUp thi cu cham bi "treo" (do tren .24: click tra 200
--- nhung cong tac khong gat, toi khi co usleep khac moi gat).
+-- SCREEN TOUCH
+-- IMPORTANT: AutoTouch only flushes touchUp to the screen when the script calls usleep.
+-- Without a usleep after touchUp the touch stays "stuck" (seen on a test device: click
+-- returned 200 but the switch did not toggle until another usleep happened).
 ----------------------------------------------------------------
 local TOUCH_SETTLE_US = 50000
 
@@ -36,8 +36,8 @@ local function tap(x, y)
     usleep(TOUCH_SETTLE_US)
 end
 
--- "click" | "clickN" | "hold". Gia tri khac (vd "check") thi khong cham.
--- Tra ve true neu da cham.
+-- "click" | "clickN" | "hold". Any other value (e.g. "check") does not touch.
+-- Returns true if a touch was performed.
 local function performAction(x, y, actionType)
     if actionType == "hold" then
         touchDown(0, x, y)
@@ -56,7 +56,7 @@ local function performAction(x, y, actionType)
     return true
 end
 
--- Goi fn() moi 200ms toi khi fn tra ve khac nil hoac het timeout (it nhat 1 lan).
+-- Call fn() every 200ms until it returns non-nil or the timeout expires (at least once).
 local function poll(timeout, fn)
     local deadline = now() + timeout
     while true do
@@ -86,7 +86,7 @@ local function sendAll(client, payload)
     return true
 end
 
--- body: chuoi JSON hoac table (tu encode)
+-- body: JSON string or table (encoded automatically)
 local function respond(client, code, body)
     if type(body) == "table" then body = json.encode(body) end
     return sendAll(client, string.format(
@@ -115,8 +115,8 @@ local function receiveFullBody(client, length)
     return table.concat(parts)
 end
 
--- Chi chay khi json.decode that bai: escape xuong dong/tab nam trong chuoi
--- (script findColors dan nhieu dong) va bo dau phay thua truoc } hoac ].
+-- Only used when json.decode fails: escape newlines/tabs inside strings
+-- (multi-line pasted findColors scripts) and drop trailing commas before } or ].
 local function fixJSON(s)
     local out, n = {}, 0
     local inStr, esc = false, false
@@ -142,7 +142,7 @@ local function fixJSON(s)
 end
 
 ----------------------------------------------------------------
--- KIEM TRA GIA TRI
+-- VALUE VALIDATION
 ----------------------------------------------------------------
 local SCRIPT_NULL = {}
 
@@ -179,19 +179,19 @@ local function normalizeRegion(region)
 end
 
 ----------------------------------------------------------------
--- COLOR: doc literal trong loi goi findColors / findColor xuat tu
--- Function Helper. KHONG chay script nhu Lua hay JS. Nhan:
+-- COLOR: read the literals of a findColors / findColor call exported by the
+-- Function Helper. The script is NOT executed as Lua or JS. Accepts:
 --   Lua (docs.autotouch.net): findColors({{0xFF0000,0,0},{0x00FF00,10,10}}, 0, {x,y,w,h})
 --                             local colors = {...}; findColors(colors, 0, region)
 --                             findColor(0xFFFFFF, 0, {x,y,w,h}) -- 0xFFFFFF, (992,489)
---   JS cu: findColors({colors: [{color: .., x: .., y: ..}], region: {...}})
+--   Legacy JS: findColors({colors: [{color: .., x: .., y: ..}], region: {...}})
 ----------------------------------------------------------------
 local function parseAutoTouchFindColorsScript(raw)
     if type(raw) ~= "string" or trim(raw) == "" then return nil, "script is empty" end
     if #raw > 262144 then return nil, "script exceeds 256 KiB" end
     local ok, result = pcall(function()
         local pos, kind, value = 1, nil, nil
-        local vars = {}   -- bien gan literal truoc loi goi: local colors = {...}
+        local vars = {}   -- literals assigned before the call: local colors = {...}
         local function fail(message)
             error(message .. " at script byte " .. pos, 0)
         end
@@ -201,7 +201,7 @@ local function parseAutoTouchFindColorsScript(raw)
                 if c:match("%s") then
                     pos = pos + 1
                 elseif pair == "--" then
-                    -- comment Lua: --[[ ... ]] / --[==[ ... ]==] hoac -- het dong
+                    -- Lua comment: --[[ ... ]] / --[==[ ... ]==] or -- to end of line
                     local eq = raw:match("^%-%-%[(=*)%[", pos)
                     if eq then
                         local close = "]" .. eq .. "]"
@@ -271,7 +271,7 @@ local function parseAutoTouchFindColorsScript(raw)
             if depth > 8 then fail("Options are nested too deeply") end
             if kind == "{" then
                 nextToken()
-                -- Lua dung {x, y, width, height}; JS dung {x: ..., y: ...}. Nhan ca hai.
+                -- Lua uses {x, y, width, height}; JS uses {x: ..., y: ...}. Accept both.
                 if kind == "number" or kind == "[" or kind == "{"
                     or (kind == "identifier" and
                         (value == "true" or value == "false" or value == "nil" or value == "null")) then
@@ -284,7 +284,7 @@ local function parseAutoTouchFindColorsScript(raw)
                     expect("}")
                     return array
                 end
-                -- Object: JS {key: v} hoac Lua {key = v}
+                -- Object: JS {key: v} or Lua {key = v}
                 local object, seen = {}, {}
                 while kind ~= "}" do
                     if kind ~= "identifier" and kind ~= "string" then fail("Expected object key") end
@@ -328,7 +328,7 @@ local function parseAutoTouchFindColorsScript(raw)
         end
         local function attachSample(options)
             local sampleColor, sampleX, sampleY
-            -- Mau lay tu Function Helper: "0xFFFFFF, (992,489)" (trong comment hoac text thuong)
+            -- Sample from the Function Helper: "0xFFFFFF, (992,489)" (in a comment or plain text)
             for c, x, y in raw:gmatch(
                 "([%+%-]?0[xX][%da-fA-F]+)%s*,%s*%(%s*([%+%-]?[%d%.]+)%s*,%s*([%+%-]?[%d%.]+)%s*%)") do
                 sampleColor, sampleX, sampleY = c, x, y
@@ -348,7 +348,7 @@ local function parseAutoTouchFindColorsScript(raw)
             end
             return options
         end
-        -- Tim loi goi findColors( / findColor( ; ghi lai cac phep gan literal phia truoc.
+        -- Find the findColors( / findColor( call; remember literal assignments before it.
         nextToken()
         local functionName
         while kind ~= "eof" do
@@ -392,7 +392,7 @@ local function parseAutoTouchFindColorsScript(raw)
         end
 
         -- findColor(color, count, region, debug, rightToLeft, bottomToTop)  (Lua)
-        -- hoac findColor({color: ...})                                       (JS)
+        -- or findColor({color: ...})                                         (JS)
         if type(args[1]) == "table" and not isNull(args[1]) then
             local options = args[1]
             if isNull(options.color) then fail("findColor requires color") end
@@ -435,14 +435,14 @@ local function normalizeColorsFromData(data)
     if colors[1][2] ~= 0 or colors[1][3] ~= 0 then
         return nil, nil, "The first color must have x=0, y=0; other points use relative offsets"
     end
-    -- Gia tri ngoai JSON (khac null) de len gia tri trong script.
+    -- Values in the outer JSON (when not null) override values in the script.
     local function option(key, defaultValue)
         if not isNull(data[key]) then return data[key] end
         if not isNull(parsed[key]) then return parsed[key] end
         return defaultValue
     end
-    -- Server chi dung diem khop dau tien -> luon quet count = 1 (dung som),
-    -- bo qua count trong script (count 0 = quet het man hinh, rat cham voi mau nen).
+    -- The server only uses the first match -> always scan with count = 1 (stop early),
+    -- ignoring the script's count (count 0 = scan the whole screen, very slow on background colors).
     local options = {count = 1}
     local regionError
     options.region, regionError = normalizeRegion(option("region"))
@@ -474,7 +474,7 @@ local function normalizeColorsFromData(data)
     return colors, options
 end
 
--- Goi ham native cua AutoTouch; loi -> error() -> server tra 500.
+-- Call a native AutoTouch function; failure -> error() -> server replies 500.
 local function nativeCall(name, fn, ...)
     local ok, res, nativeError = pcall(fn, ...)
     if not ok then error(name .. " failed: " .. tostring(res), 0) end
@@ -501,7 +501,7 @@ local function processColor(client, data)
     local sample, actualColor = opts.sample, nil
     local found = poll(timeout, function()
         if sample then
-            -- Co toa do mau -> chi doc 1 pixel (nhanh hon quet ca vung)
+            -- Sample coordinate known -> read a single pixel (faster than scanning the region)
             actualColor = toNumber(nativeCall("getColor", getColor, sample.x, sample.y))
             if not actualColor then error("getColor returned an invalid result", 0) end
             if actualColor == sample.color then return {sample.x, sample.y} end
@@ -528,16 +528,16 @@ local function processColor(client, data)
 end
 
 ----------------------------------------------------------------
--- POINTS: 1 diem goc + cac diem neo. 3 cach ghi:
---   1) Dan NGUYEN VAN ban xuat Function Helper + "at": [x, y] = vi tri mau dau tien:
+-- POINTS: 1 base point + anchor points. Three input formats:
+--   1) Paste the Function Helper export VERBATIM + "at": [x, y] = position of the first color:
 --      "script": "const [result, error] = findColors({ colors: [ {color: 47740, x: 0, y: 0}, ... ] })",
 --      "at": [930, 387]
---   2) Toa do tuyet doi: "script": "0x00BA7C, (930,387)\n0xFFFFFF, (1006,387)"
+--   2) Absolute coordinates: "script": "0x00BA7C, (930,387)\n0xFFFFFF, (1006,387)"
 --   3) JSON: "points": [["0x00BA7C", 930, 387], {"color": 16777215, "x": 1006, "y": 387}]
--- Diem dau tien la goc (diem se bam). Mac dinh doc mau DUNG tai cac toa do
--- (getColors, nhanh, khong co chuyen trung), "tolerance": sai so moi kenh R/G/B.
--- "search": N -> neu khong khop tai cho, tim ca mau lech toi N px bang findColors
--- (AutoTouch so mau chinh xac, khong ap dung tolerance).
+-- The first point is the base (the point that gets tapped). By default colors are read
+-- EXACTLY at the coordinates (getColors: fast, no false matches); "tolerance": max
+-- difference per R/G/B channel. "search": N -> if nothing matches in place, search the
+-- pattern shifted by up to N px with findColors (exact colors, tolerance not applied).
 ----------------------------------------------------------------
 local function parsePoints(data)
     local list = {}
@@ -548,7 +548,7 @@ local function parsePoints(data)
             list[i] = {p.color or p[1], p.x or p[2], p.y or p[3]}
         end
     elseif type(data.script) == "string" and data.script:find("findColors?%s*%(") then
-        -- Ban xuat findColors/findColor dan nguyen van: diem neo la do lech so voi "at"
+        -- Verbatim findColors/findColor export: anchors are offsets from "at"
         local at = data.at
         local ax = type(at) == "table" and toNumber(at.x or at[1])
         local ay = type(at) == "table" and toNumber(at.y or at[2])
@@ -588,7 +588,7 @@ local function parsePoints(data)
     return points
 end
 
--- So 2 mau voi sai so moi kenh R/G/B <= tol
+-- Compare 2 colors with a per-channel R/G/B tolerance <= tol
 local function colorClose(a, b, tol)
     if a == b then return true end
     if not a or tol <= 0 then return false end
@@ -707,7 +707,7 @@ local function processCommand(client, data, action)
 end
 
 ----------------------------------------------------------------
--- TIM TEXT (OCR) / ANH
+-- FIND TEXT (OCR) / IMAGE
 ----------------------------------------------------------------
 local function processSearch(client, data)
     local timeout = toNumber(data.timeout) or 15
@@ -738,7 +738,7 @@ local function processSearch(client, data)
     if data.text then
         local word   = trim(tostring(data.text)):lower()
         local target = word:gsub("%s+", "")
-        -- ex = true/khong gui: text OCR bang hoac KET THUC bang target; ex = false: chua target
+        -- ex = true/omitted: OCR text equals or ENDS WITH target; ex = false: contains target
         local exact  = data.ex == nil or data.ex == true
         local opts = {method = OCR_METHOD.IOS_VISION, languages = {"en-US"},
             correct = true, timeout = 5, debug = DEBUG_MODE, region = region}
@@ -757,7 +757,7 @@ local function processSearch(client, data)
                 end
                 local r = item.rectangle
                 if match and r and r.topLeft and r.topRight and r.bottomLeft then
-                    -- Uoc luong tam cua tu can tim trong dong text
+                    -- Estimate the center of the target word inside the text line
                     local line = text:lower()
                     local s, e = line:find(word, 1, true)
                     local x
@@ -780,7 +780,7 @@ local function processSearch(client, data)
 end
 
 ----------------------------------------------------------------
--- SAVE_PHOTO (body = bytes anh, header X-Action: SAVE_PHOTO)
+-- SAVE_PHOTO (body = image bytes, header X-Action: SAVE_PHOTO)
 ----------------------------------------------------------------
 local function processSavePhoto(client, headers)
     local len = tonumber(headers["content-length"]) or 0
@@ -796,9 +796,9 @@ local function processSavePhoto(client, headers)
 
     local saveFunc = saveToSystemAlbum or saveImageToAlbum or saveToAlbum
     local ok = saveFunc ~= nil and pcall(saveFunc, path)
-    -- AutoTouch chi that su luu anh khi script nhuong luot (usleep/execute). Xoa ngay
-    -- (os.remove) la mat file truoc khi Photos doc -> tra "Saved" nhung album khong co anh.
-    -- Giu dung cach cu: cho mot nhip roi xoa bang execute("rm").
+    -- AutoTouch only really saves the photo when the script yields (usleep/execute). Deleting
+    -- right away (os.remove) loses the file before Photos reads it -> "Saved" but no photo.
+    -- Keep the old approach: wait a moment, then delete with execute("rm").
     usleep(300000)
     execute("rm " .. path)
     if not saveFunc then
@@ -811,7 +811,7 @@ local function processSavePhoto(client, headers)
 end
 
 ----------------------------------------------------------------
--- XU LY 1 REQUEST
+-- HANDLE ONE REQUEST
 ----------------------------------------------------------------
 local function handleRequest(client)
     client:settimeout(5)
@@ -839,7 +839,7 @@ local function handleRequest(client)
     local body, receiveError = receiveFullBody(client, contentLength)
     if not body then return fail(client, 400, "Incomplete body: " .. tostring(receiveError)) end
 
-    -- JSON chuan truoc; loi thi sua (xuong dong trong chuoi, dau phay thua) roi thu lai.
+    -- Try strict JSON first; on failure fix it (newlines in strings, trailing commas) and retry.
     local ok, data = pcall(json.decode, body)
     if not ok then ok, data = pcall(json.decode, fixJSON(body)) end
     if not ok or type(data) ~= "table" then return fail(client, 400, "Invalid JSON") end
@@ -861,13 +861,13 @@ local function handleRequest(client)
 end
 
 ----------------------------------------------------------------
--- VONG LAP SERVER
+-- SERVER LOOP
 ----------------------------------------------------------------
 local function startServer()
     local server = socket.bind("0.0.0.0", PORT)
     if not server then return end
-    -- Giong code cu: accept() KHONG chan + usleep(50ms) khi ranh. KHONG doi sang
-    -- accept() chan: AutoTouch chi day cham (touchUp) ra man hinh trong usleep.
+    -- Same as the old code: NON-blocking accept() + usleep(50ms) when idle. Do NOT switch
+    -- to a blocking accept(): AutoTouch only flushes touches (touchUp) during usleep.
     server:settimeout(0)
 
     local lastRequest = now()
@@ -886,7 +886,7 @@ local function startServer()
         else
             usleep(50000)
             if dirty then
-                collectgarbage("collect")   -- don rac 1 lan khi het dot request
+                collectgarbage("collect")   -- collect garbage once after a burst of requests
                 dirty = false
             end
             if IDLE_EXIT_S > 0 and now() - lastRequest > IDLE_EXIT_S then break end

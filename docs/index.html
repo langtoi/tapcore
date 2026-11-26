@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -20,7 +20,7 @@ h1{font-size:26px}
 h2{font-size:16px}
 .btn{display:block;text-align:center;padding:13px;border-radius:12px;background:linear-gradient(135deg,#0891b2,#4f46e5);color:#fff;font-weight:600;text-decoration:none}
 code{font-family:"SF Mono",Consolas,monospace;font-size:13px;background:rgba(127,127,127,.14);padding:2px 6px;border-radius:6px;word-break:break-all}
-ul,ol{padding-left:20px;display:flex;flex-direction:column;gap:4px}
+ul{padding-left:20px;display:flex;flex-direction:column;gap:4px}
 a{color:var(--cyan)}
 footer{color:var(--muted);font-size:13px;text-align:center}
 </style>
@@ -31,39 +31,39 @@ footer{color:var(--muted);font-size:13px;text-align:center}
     <img src="icon-512.png" alt="TapCore">
     <div>
       <h1>TapCore</h1>
-      <div class="sub">Tự động hoá Lua tương thích AutoTouch cho iOS 15–16 rootless</div>
+      <div class="sub">AutoTouch-compatible Lua automation for rootless iOS 15–16</div>
     </div>
   </header>
 
   <section class="card">
-    <h2>Thêm nguồn vào Sileo</h2>
-    <a class="btn" href="sileo://source/https://langtoi.github.io/tapcore/">Mở Sileo và thêm nguồn</a>
-    <div class="sub">Hoặc thêm thủ công trong Sileo → Sources → + :</div>
+    <h2>Add this source to Sileo</h2>
+    <a class="btn" href="sileo://source/https://langtoi.github.io/tapcore/">Open Sileo and add source</a>
+    <div class="sub">Or add it manually in Sileo → Sources → + :</div>
     <code>https://langtoi.github.io/tapcore/</code>
-    <div class="sub">Sau đó tìm <b>TapCore</b> và bấm Get.</div>
+    <div class="sub">Then search for <b>TapCore</b> and tap Get.</div>
   </section>
 
   <section class="card">
-    <h2>Sau khi cài</h2>
+    <h2>After installing</h2>
     <ul>
-      <li>App <b>TapCore</b> xuất hiện trên màn hình chính.</li>
-      <li>Web Studio: <code>http://&lt;IP iPhone&gt;:8080</code> (cổng 8088 nếu 8080 bận).</li>
-      <li>Script Lua nằm ở <code>/var/jb/var/mobile/Library/AutoTouch/Scripts</code>, chạy <code>sv.lua</code> để mở cổng 3000 cho BAS.</li>
-      <li>Bản cũ ghost-atd / GhostStudio được tự gỡ khi cài.</li>
+      <li>The <b>TapCore</b> app appears on the Home Screen.</li>
+      <li>Web Studio: <code>http://&lt;iphone-ip&gt;:8080</code> (port 8088 when 8080 is busy).</li>
+      <li>Lua scripts live in <code>/var/jb/var/mobile/Library/AutoTouch/Scripts</code>; run <code>sv.lua</code> to open port 3000 for BAS.</li>
+      <li>An older ghost-atd / GhostStudio install is removed automatically.</li>
     </ul>
   </section>
 
   <section class="card">
-    <h2>Tính năng</h2>
+    <h2>Features</h2>
     <ul>
-      <li>touchDown/Move/Up, phím cứng, inputText, copyText</li>
+      <li>touchDown/Move/Up, hardware keys, inputText, copyText</li>
       <li>getColor, getColors, findColors, findImage</li>
-      <li>OCR bằng Apple Vision, ghi thao tác chạm thành Lua</li>
-      <li>execute, openURL, appKill, lưu và xoá ảnh Photos</li>
+      <li>Apple Vision OCR, touch recorder that writes Lua</li>
+      <li>execute, openURL, appKill, save and clear Photos</li>
     </ul>
   </section>
 
-  <footer>Mã nguồn: <a href="https://github.com/langtoi/tapcore">github.com/langtoi/tapcore</a></footer>
+  <footer>Source code: <a href="https://github.com/langtoi/tapcore">github.com/langtoi/tapcore</a></footer>
 </main>
 </body>
 </html>

@@ -2,41 +2,42 @@
 
 # TapCore
 
-Runtime tự động hoá Lua tương thích AutoTouch cho iPhone jailbreak **rootless iOS 15–16** (Dopamine/Procursus). Không hook SpringBoard.
+AutoTouch-compatible Lua automation runtime for jailbroken **rootless iOS 15–16** (Dopamine/Procursus). It does not hook SpringBoard.
 
-- Chạm, vuốt, phím cứng, gõ chữ bằng IOKit HID
-- Đọc màu, tìm màu, tìm ảnh, OCR bằng Apple Vision
-- Chạy `sv.lua` nguyên văn cho client BAS (cổng `3000`)
-- Web Studio và app **TapCore** để quản lý script, chụp/cắt ảnh, OCR, ghi thao tác chạm
+- Touch, swipe, hardware keys and typing through IOKit HID
+- Pixel colors, color patterns, template image search, Apple Vision OCR
+- Runs `sv.lua` unmodified for the BAS client (port `3000`)
+- Web Studio and the **TapCore** app to manage scripts, capture/crop screenshots, run OCR and record touches
 
-## Cài đặt qua Sileo
+## Install with Sileo
 
-1. Mở Sileo → **Sources** → **+**
-2. Thêm nguồn: `https://langtoi.github.io/tapcore/`
-3. Tìm **TapCore** → **Get**
+1. Open Sileo → **Sources** → **+**
+2. Add the source `https://langtoi.github.io/tapcore/`
+3. Search for **TapCore** → **Get**
 
-Hoặc mở trang https://langtoi.github.io/tapcore/ trên iPhone và bấm nút thêm nguồn.
+Or open https://langtoi.github.io/tapcore/ on the iPhone and tap the add-source button.
 
-Sau khi cài:
-- App **TapCore** có trên màn hình chính.
-- Web Studio: `http://<IP iPhone>:8080` (tự chuyển sang `8088` nếu `8080` bận).
-- Script Lua đặt trong `/var/jb/var/mobile/Library/AutoTouch/Scripts/`.
+After installing:
+- The **TapCore** app appears on the Home Screen.
+- Web Studio: `http://<iphone-ip>:8080` (switches to `8088` when `8080` is busy).
+- Lua scripts live in `/var/jb/var/mobile/Library/AutoTouch/Scripts/`.
+- An older `ghost-atd` / GhostStudio install is removed automatically.
 
-## Tài liệu
+## Documentation
 
-- [API.md](API.md): REST API cổng 8080, API `sv.lua` cổng 3000, danh sách hàm Lua.
-- [HANDOFF.md](HANDOFF.md): kiến trúc, đường dẫn, build, các lưu ý kỹ thuật.
+- [API.md](API.md): REST API on port 8080, `sv.lua` API on port 3000, native Lua functions.
+- [HANDOFF.md](HANDOFF.md): architecture, install paths, build and technical notes.
 
-## Build & phát hành (dành cho dev)
+## Build & release (developers)
 
-Cần Windows + WSL Ubuntu có Theos (`/opt/theos`, SDK iPhoneOS16.5) và `dpkg-dev`.
+Requires Windows + WSL Ubuntu with Theos (`/opt/theos`, iPhoneOS16.5 SDK) and `dpkg-dev`.
 
 ```bash
 wsl bash -lc 'bash /mnt/d/CHUNG_CHUNG/AUTO/tapcore/build.sh'          # build + .deb
-wsl bash -lc 'bash /mnt/d/CHUNG_CHUNG/AUTO/tapcore/tools/make_repo.sh' # cập nhật repo Sileo trong docs/
-git add -A && git commit -m "TapCore x.y.z" && git push                # GitHub Pages phát hành
+wsl bash -lc 'bash /mnt/d/CHUNG_CHUNG/AUTO/tapcore/tools/make_repo.sh' # refresh the Sileo repo in docs/
+git add -A && git commit -m "TapCore x.y.z" && git push                # GitHub Pages publishes it
 ```
 
-Tăng số trong `VERSION` trước mỗi lần phát hành để Sileo nhận bản cập nhật.
+Bump the number in `VERSION` before each release so Sileo offers the update.
 
-> Cổng 8080 và 3000 không có mật khẩu và daemon chạy quyền root: chỉ dùng trong mạng LAN tin cậy.
+> Ports 8080 and 3000 have no authentication and the daemon runs as root: use TapCore on a trusted LAN only.

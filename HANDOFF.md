@@ -1,112 +1,113 @@
 # TapCore — Technical Handoff
 
-Tài liệu kỹ thuật để AI hoặc kỹ sư khác tiếp nhận và phát triển tiếp TapCore. API chi tiết xem [API.md](API.md).
+Technical notes for an engineer or AI picking up TapCore. Full API details are in [API.md](API.md).
 
-TapCore là tên mới của dự án trước đây gọi là `ghost-atd` / GhostStudio. Gói `.deb` tự gỡ bản cũ khi cài.
-
----
-
-## 1. Mục tiêu & bối cảnh
-- Thay thế **AutoTouch** (`ATTweak.dylib` hook SpringBoard, dễ gây Safe Mode, cần license) bằng một runtime nhẹ, ổn định, chạy nguyên văn `sv.lua` (HTTP `:3000`) cho client **BAS**.
-- Thống kê payload BAS thực tế (331 request `:3000`): **66%** Vision OCR (`text` + `click`/`check`/`click3`/`hold`), **21%** `RUNLUA` (`execute`, `touchDown/Move/Up`, `keyDown/Up HOME_BUTTON`, `clearSystemAlbum`, `copyText`, `appKill`), **5%** `URL`, **5%** `TEXT`, **3%** `COLOR`/`findColor`, **<1%** `findImage`.
-- Thành phần:
-  1. Daemon root `tapcore`: Lua 5.3.6 + 21 hàm native + Multi-Script Runner + Web Server + Touch Recorder + System Tools.
-  2. Dylib `TapCoreInput.dylib`: chỉ phục vụ `copyText` và gõ Unicode; **không hook hàm nào, bỏ qua SpringBoard**.
-  3. App iOS `TapCore.app` (UIKit, bundle id `com.tapcore.app`).
-  4. Web Studio `web/index.html` (không phụ thuộc CDN).
+TapCore is the new name of the project previously called `ghost-atd` / GhostStudio. The `.deb` removes the old install automatically.
 
 ---
 
-## 2. Môi trường build & máy test
-- **Build:** Windows + WSL Ubuntu với `/opt/theos` (`clang` LLVM-19, `ld64.lld`, `/opt/theos/sdks/iPhoneOS16.5.sdk`, `ldid`, `dpkg-deb`, `dpkg-scanpackages`).
-- **Máy test:** iPhone X (`iPhone10,3`, `1125×2436`), **iOS 16.7.12** (`20H364`), jailbreak **rootless** (`/var/jb`, Dopamine/Procursus).
-  - Shell trên máy là `/var/jb/bin/sh` (**không có `/bin/sh`**).
-  - IP và mật khẩu SSH không ghi trong repo; `tools/deploy_verify.py` đọc mật khẩu từ biến môi trường `TAPCORE_SSH_PASS` hoặc hỏi khi chạy.
+## 1. Goal & context
+- Replace **AutoTouch** (`ATTweak.dylib` hooks SpringBoard, can trigger Safe Mode, needs a license) with a lightweight, stable runtime that runs `sv.lua` (HTTP `:3000`) unmodified for the **BAS** client.
+- Real BAS payload mix (331 requests to `:3000`): **66%** Vision OCR (`text` + `click`/`check`/`click3`/`hold`), **21%** `RUNLUA` (`execute`, `touchDown/Move/Up`, `keyDown/Up HOME_BUTTON`, `clearSystemAlbum`, `copyText`, `appKill`), **5%** `URL`, **5%** `TEXT`, **3%** `COLOR`/`findColor`, **<1%** `findImage`.
+- Components:
+  1. Root daemon `tapcore`: Lua 5.3.6 + 21 native functions + multi-script runner + web server + touch recorder + system tools.
+  2. `TapCoreInput.dylib`: only serves `copyText` and Unicode typing; **hooks nothing and skips SpringBoard**.
+  3. iOS app `TapCore.app` (UIKit, bundle id `com.tapcore.app`).
+  4. Web Studio `web/index.html` (no CDN dependencies).
 
 ---
 
-## 3. Cấu trúc mã nguồn
+## 2. Build environment & test device
+- **Build:** Windows + WSL Ubuntu with `/opt/theos` (`clang` LLVM-19, `ld64.lld`, `/opt/theos/sdks/iPhoneOS16.5.sdk`, `ldid`, `dpkg-deb`, `dpkg-scanpackages`).
+- **Test device:** iPhone X (`iPhone10,3`, `1125×2436`), **iOS 16.7.12** (`20H364`), **rootless** jailbreak (`/var/jb`, Dopamine/Procursus).
+  - The shell on the device is `/var/jb/bin/sh` (**there is no `/bin/sh`**).
+  - Device IPs and SSH passwords are not stored in the repo; `tools/deploy_verify.py` reads the password from `TAPCORE_SSH_PASS` or prompts for it.
+
+---
+
+## 3. Source layout
 
 ```text
 tapcore/
-├── VERSION                   # Phiên bản gói (.deb và repo Sileo)
-├── build.sh                  # Build Lua objs, daemon, dylib, app rồi đóng gói .deb
-├── entitlements.plist        # Private entitlements cho daemon (HID, IOSurface, QuartzCore, Photos)
+├── VERSION                   # Package version (.deb and Sileo repo)
+├── build.sh                  # Build Lua objects, daemon, dylib, app, then package the .deb
+├── entitlements.plist        # Private entitlements for the daemon (HID, IOSurface, QuartzCore, Photos)
 ├── API.md / HANDOFF.md / README.md
 ├── src/
-│   ├── tapcore.h             # Header dùng chung (đường dẫn, API nội bộ)
-│   ├── core.m                # 21 API native: IOKit HID touch/key/recorder, CARenderServer, OCR, findImage, IPC :3001, logger
-│   ├── runner.m              # Multi-script runner (Stop tức thì bằng lua_sethook), config.json, print() -> Live Console
+│   ├── tapcore.h             # Shared header (paths, internal API)
+│   ├── core.m                # 21 native APIs: IOKit HID touch/key/recorder, CARenderServer, OCR, findImage, IPC :3001, logger
+│   ├── runner.m              # Multi-script runner (instant Stop via lua_sethook), config.json, print() -> Live Console
 │   ├── web.m                 # HTTP server :8080 (fallback :8088), REST API, /control/*, /api/system
-│   ├── lua_socket.m          # Thay LuaSocket bằng POSIX socket + poll() ngắt được
-│   ├── lua_json.m            # Thay json.lua bằng NSJSONSerialization
-│   └── main.m                # Entry: nâng Jetsam 512MB, IPC, config, web server, auto-start
+│   ├── lua_socket.m          # LuaSocket replacement on POSIX sockets with interruptible poll()
+│   ├── lua_json.m            # json.lua replacement on NSJSONSerialization
+│   └── main.m                # Entry point: raise Jetsam to 512 MB, IPC, config, web server, auto-start
 ├── tweak/
 │   ├── TapCoreInput.m        # Dylib: Darwin notify com.tapcore.cmd -> TCP 127.0.0.1:3001 -> UIPasteboard / UIKeyInput
-│   └── TapCoreInput.plist    # Filter com.apple.UIKit
-├── app/                      # TapCore.app: main.m, Info.plist, entitlements, icon PNG
+│   └── TapCoreInput.plist    # Filter: com.apple.UIKit
+├── app/                      # TapCore.app: main.m, Info.plist, entitlements, icon PNGs
 ├── web/index.html            # Web Studio
-├── scripts/sv.lua            # sv.lua chuẩn của BAS (được cài kèm nếu máy chưa có)
+├── scripts/sv.lua            # Reference sv.lua for BAS (installed only when the device has none)
 ├── packaging/                # control, preinst, postinst, prerm, com.tapcore.daemon.plist
-├── assets/make_icons.py      # Vẽ logo TapCore ra mọi kích thước PNG
+├── assets/make_icons.py      # Renders the TapCore logo to every PNG size
 ├── tools/
-│   ├── make_repo.sh          # Copy .deb vào docs/debs và tạo Packages*, Release
-│   └── deploy_verify.py      # Cài .deb qua SSH lên 1 máy và chạy kiểm tra nhanh
-└── docs/                     # Repo Sileo, phục vụ bởi GitHub Pages: https://langtoi.github.io/tapcore/
+│   ├── make_repo.sh          # Copy the .deb into docs/debs and generate Packages*, Release
+│   └── deploy_verify.py      # Install the .deb on one device over SSH and run smoke tests
+└── docs/                     # Sileo repo served by GitHub Pages: https://langtoi.github.io/tapcore/
 ```
 
-### Đường dẫn sau khi cài trên iPhone rootless
-| Thành phần | Đường dẫn |
+### Installed paths on a rootless iPhone
+| Component | Path |
 |---|---|
 | Daemon | `/var/jb/usr/bin/tapcore` |
 | LaunchDaemon | `/var/jb/Library/LaunchDaemons/com.tapcore.daemon.plist` (label `com.tapcore.daemon`) |
 | Dylib | `/var/jb/Library/MobileSubstrate/DynamicLibraries/TapCoreInput.dylib` + `.plist` |
 | App | `/var/jb/Applications/TapCore.app` |
-| Web UI, sv.lua mẫu | `/var/jb/usr/share/tapcore/web/index.html`, `/var/jb/usr/share/tapcore/sv.lua` |
-| Cấu hình | `/var/jb/var/mobile/Library/TapCore/config.json` |
-| Scripts, ảnh mẫu | `/var/jb/var/mobile/Library/AutoTouch/Scripts/` và `Screenshots/` (giữ tên AutoTouch để BAS không phải sửa) |
-| Runtime | `/tmp/tapcore.port` (cổng web đang chạy), `/tmp/tapcore.log` |
+| Web UI, reference sv.lua | `/var/jb/usr/share/tapcore/web/index.html`, `/var/jb/usr/share/tapcore/sv.lua` |
+| Configuration | `/var/jb/var/mobile/Library/TapCore/config.json` |
+| Scripts, template images | `/var/jb/var/mobile/Library/AutoTouch/Scripts/` and `Screenshots/` (AutoTouch name kept so BAS needs no changes) |
+| Runtime | `/tmp/tapcore.port` (active web port), `/tmp/tapcore.log` |
 
 ---
 
-## 4. Build, phát hành & cài đặt
+## 4. Build, release & install
 
 ```bash
-# 1. Build + đóng gói .deb (WSL)
+# 1. Build + package the .deb (WSL)
 wsl bash -lc 'bash /mnt/d/CHUNG_CHUNG/AUTO/tapcore/build.sh'
 
-# 2. Cập nhật repo Sileo trong docs/
+# 2. Refresh the Sileo repo in docs/
 wsl bash -lc 'bash /mnt/d/CHUNG_CHUNG/AUTO/tapcore/tools/make_repo.sh'
 
-# 3. Commit + push: GitHub Pages phục vụ docs/ -> Sileo thấy bản mới
+# 3. Commit + push: GitHub Pages serves docs/ and Sileo sees the new version
 git add -A && git commit -m "TapCore x.y.z" && git push
 ```
 
-- **Phát hành bản mới:** tăng số trong `VERSION`, chạy lại 3 bước trên.
-- **Cài trên iPhone:** Sileo → Sources → thêm `https://langtoi.github.io/tapcore/` → cài **TapCore**.
-- **Cài thử nhanh 1 máy qua SSH (dev):** `python tools\deploy_verify.py <iphone-ip>`.
-- `preinst` tự gỡ bản cũ `ghost-atd` (daemon `com.ghost.atd`, `ghost_input.dylib`, `GhostStudio.app`) và chuyển `config.json` sang thư mục TapCore.
+- **New release:** bump `VERSION`, then repeat the three steps.
+- **Install on an iPhone:** Sileo → Sources → add `https://langtoi.github.io/tapcore/` → install **TapCore**.
+- **Quick dev install on one device over SSH:** `python tools\deploy_verify.py <iphone-ip>`.
+- `preinst` removes the old `ghost-atd` install (daemon `com.ghost.atd`, `ghost_input.dylib`, `GhostStudio.app`) and migrates `config.json` to the TapCore folder.
 
 ---
 
-## 5. Các điểm kỹ thuật sống còn trên iOS 16.7.12 (tránh lặp lại)
-1. **Chạm & vuốt (`IOHIDEvent`):** tự dò `SenderID` thật của digitizer qua `IOHIDEventSystemClientCopyServices` (`PrimaryUsagePage == 0x0D`, `PrimaryUsage == 0x04/0x05`) và set `kIOHIDEventFieldDigitizerIsDisplayIntegrated = 1`. `touchDown/Move/Up` dùng `fingerID = id + 1` để tránh `fingerID = 0`.
-2. **Gõ chữ:** chuỗi thuần ASCII luôn gõ bằng phím cứng HID (`IOHIDEventCreateKeyboardEvent`, `usagePage = 0x07`), chạy được cả ô Password. **Không gọi `UIKeyboardImpl insertText:` trước HID** vì trên iOS 16 nó ACK giả. Dylib chỉ dùng cho `copyText` (daemon CLI bị `PBErrorDomain Code=11`) và chuỗi non-ASCII.
-3. **Chụp màn hình & OCR:** 1 `IOSurfaceRef` tái sử dụng + `CARenderServerRenderDisplay(0, CFSTR("LCD"), surf, 0, 0)` (~17 ms/frame). Không dùng `kIOSurfaceIsGlobal`. Cần entitlements `iokit-user-client-class` (`IOSurfaceRootUserClient`, `IOSurfaceAcceleratorClient`) + `no-sandbox` + `QuartzCore.global-capture/secure-capture/displayable-context`.
-4. **Jetsam:** daemon dưới launchd bị giới hạn RAM thấp làm OCR bị kill. Gọi `memorystatus_control(MEMORYSTATUS_CMD_SET_JETSAM_TASK_LIMIT, getpid(), 512, ...)` và khai báo `JetsamMemoryLimit = 512` trong plist.
-5. **OCR `region`:** dùng `CVPixelBufferCreateWithIOSurface` + `VNRecognizeTextRequest.regionOfInterest` (tránh `initWithCGImage:` vì dễ crash trong daemon).
-6. **`usleep` số thực:** vòng chia lát 25 ms dùng `int64_t rem = llround(us)`; dùng `double` sẽ lặp vô hạn.
-7. **Double-Home:** `keyUp` tự đệm tối thiểu 20 ms sau `keyDown` để SpringBoard nhận double-click.
-8. **Shell rootless:** không có `/bin/sh` → `execute()` dùng `fork/execl` với `/var/jb/bin/sh`; `loslib.c` được patch lúc build thay `system()` bằng `tapcore_ios_system()`. Script cài đặt trong `.deb` cũng dùng shebang `#!/var/jb/bin/sh`.
-9. **`appKill`:** `BKSTerminateApplication...` + tra `CFBundleExecutable` qua `LSApplicationProxy` rồi `killall -9`.
-10. **Build Lua với `ld64.lld`:** không đóng `liblua.a` bằng GNU `ar`; link thẳng `build/lua_obj/*.o`.
-11. **Đóng gói:** stage `.deb` trên filesystem Linux (`mktemp -d`), vì `/mnt/d` (NTFS) không giữ quyền 0755/0644 mà `dpkg-deb` yêu cầu.
+## 5. Critical iOS 16.7.12 notes (do not regress)
+1. **Touch & swipe (`IOHIDEvent`):** detect the real digitizer `SenderID` via `IOHIDEventSystemClientCopyServices` (`PrimaryUsagePage == 0x0D`, `PrimaryUsage == 0x04/0x05`) and set `kIOHIDEventFieldDigitizerIsDisplayIntegrated = 1`. `touchDown/Move/Up` use `fingerID = id + 1` to avoid `fingerID = 0`.
+2. **Typing:** pure ASCII is always typed with the HID keyboard (`IOHIDEventCreateKeyboardEvent`, `usagePage = 0x07`), which also works in password fields. **Do not call `UIKeyboardImpl insertText:` before HID**: on iOS 16 it acknowledges without filling password fields. The dylib is only for `copyText` (the CLI daemon gets `PBErrorDomain Code=11`) and non-ASCII strings.
+3. **Screen capture & OCR:** one reusable `IOSurfaceRef` + `CARenderServerRenderDisplay(0, CFSTR("LCD"), surf, 0, 0)` (~17 ms/frame). Do not use `kIOSurfaceIsGlobal`. Requires `iokit-user-client-class` (`IOSurfaceRootUserClient`, `IOSurfaceAcceleratorClient`) + `no-sandbox` + `QuartzCore.global-capture/secure-capture/displayable-context` entitlements.
+4. **Jetsam:** launchd daemons get a low memory limit and OCR gets killed. Call `memorystatus_control(MEMORYSTATUS_CMD_SET_JETSAM_TASK_LIMIT, getpid(), 512, ...)` and set `JetsamMemoryLimit = 512` in the plist.
+5. **OCR `region`:** use `CVPixelBufferCreateWithIOSurface` + `VNRecognizeTextRequest.regionOfInterest` (avoid `initWithCGImage:`, which crashes easily inside a daemon).
+6. **Fractional `usleep`:** the 25 ms slicing loop uses `int64_t rem = llround(us)`; a `double` remainder loops forever.
+7. **Double-Home:** `keyUp` waits at least 20 ms after `keyDown` so SpringBoard registers a double-click.
+8. **Rootless shell:** there is no `/bin/sh`, so `execute()` uses `fork/execl` with `/var/jb/bin/sh`; `loslib.c` is patched at build time to replace `system()` with `tapcore_ios_system()`. Package maintainer scripts use the `#!/var/jb/bin/sh` shebang.
+9. **`appKill`:** `BKSTerminateApplication...` + look up `CFBundleExecutable` via `LSApplicationProxy`, then `killall -9`.
+10. **Linking Lua with `ld64.lld`:** do not archive `liblua.a` with GNU `ar` (no Mach-O symbol index); link `build/lua_obj/*.o` directly.
+11. **Packaging:** stage the `.deb` on the Linux filesystem (`mktemp -d`), because `/mnt/d` (NTFS) cannot hold the 0755/0644 modes `dpkg-deb` requires.
 
 ---
 
-## 6. Giới hạn đã biết / việc có thể làm tiếp
-- Cổng `:8080` và `:3000` không có xác thực, daemon chạy root: chỉ dùng trong mạng LAN tin cậy.
-- Lệnh Stop không ngắt được hàm native đang chặn (`execute` chạy lệnh lâu, OCR, `saveToSystemAlbum`).
-- `io.popen` của Lua vẫn gọi `/bin/sh` nên không chạy trên rootless; dùng `execute()` thay thế.
-- `usleep` giới hạn 60 giây mỗi lần gọi; `findImage` chỉ trả 1 kết quả.
-- Nếu máy còn dịch vụ khác chiếm `:8080` (ví dụ `com.catscript.server`), TapCore tự chạy ở `:8088`.
+## 6. Known limitations / possible next steps
+- Ports `:8080` and `:3000` have no authentication and the daemon runs as root: trusted LAN only.
+- Stop cannot interrupt a blocking native call (`execute` running a long command, OCR, `saveToSystemAlbum`).
+- Lua `io.popen` still calls `/bin/sh` and fails on rootless; use `execute()` instead.
+- `usleep` is capped at 60 seconds per call; `findImage` returns only one match.
+- The Sileo repo is unsigned (no `Release.gpg` / `InRelease`).
+- If another service holds `:8080` (e.g. `com.catscript.server`), TapCore runs on `:8088`.
