@@ -1,3 +1,25 @@
+Package: com.langtoi.iostoolkit
+Name: Langtoi iOS Toolkit
+Version: 1.5.11
+Architecture: iphoneos-arm64
+Priority: optional
+Section: Utilities
+Maintainer: Langtoi
+Author: Langtoi
+Homepage: https://github.com/langtoi/tapcore
+Replaces: com.langtoi.igghostguard, com.langtoi.threadsghostguard, com.langtoi.redditghostguard, com.langtoi.autotouchalertfilter, com.langtoi.threadscookie
+Provides: com.langtoi.igghostguard, com.langtoi.threadsghostguard, com.langtoi.redditghostguard, com.langtoi.threadscookie
+Conflicts: com.langtoi.igghostguard, com.langtoi.threadsghostguard, com.langtoi.redditghostguard, com.langtoi.autotouchalertfilter, com.langtoi.threadscookie
+Depends: firmware (>= 15.0), com.opa334.crane (>= 1.3.17), python3, ellekit | mobilesubstrate
+Suggests: ldid
+Description: Rootless toolkit for Crane, Ghost and X container switching.
+ Includes x-container, crane-restore, ghost guards and session sync tools.
+Filename: debs/com.langtoi.iostoolkit_1.5.11_iphoneos-arm64.deb
+Size: 387410
+MD5sum: 892aa9fdf8b24968156ec6bce9517887
+SHA1: d200905af5d36498b4c58e5ab51fc08a19cabaf9
+SHA256: cdfd24559e54dd15fecc4d401e14bc4efd825a9c4caf8c5567ce2112548e032a
+
 Package: com.tapcore
 Name: TapCore
 Version: 1.1.0

@@ -44,6 +44,7 @@ Building locally is still possible from the repo root, in Linux/WSL with Theos (
 bash build.sh                                  # build + .deb in build/
 python tools/remote_install.py <iphone-ip>     # install that .deb on a device already running TapCore
 bash tools/make_repo.sh                        # refresh the Sileo repo in docs/
+bash tools/make_repo.sh --add <other.deb>      # add/update another package in the same Sileo source
 ```
 
 `tools/remote_install.py` installs through the daemon's own HTTP API (no SSH), so a test build can be tried on a device before it is pushed.
