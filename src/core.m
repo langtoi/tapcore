@@ -91,8 +91,10 @@ static void (*p_CARenderServerRenderDisplay)(kern_return_t, CFStringRef, IOSurfa
 static void (*p_BKSTerminateApplicationForReasonAndReportWithDescription)(CFStringRef, int, Boolean, CFStringRef);
 
 // ---------------- Global Runtime State ----------------
+static pthread_mutex_t g_hidLock = PTHREAD_MUTEX_INITIALIZER;
 static IOHIDEventSystemClientRef g_hidClient = NULL;
 static uint64_t g_senderID = 0xDEFACEDBEEFCAFE5ULL;
+static time_t g_hidLastCheck = 0;
 static int g_screenW = 1125;
 static int g_screenH = 2436;
 static NSString *g_scriptsDir = nil;
@@ -111,7 +113,17 @@ int  tapcore_script_should_stop(void)  { return __sync_fetch_and_add(&g_stopRequ
 
 int      tapcore_screen_width(void)  { return g_screenW; }
 int      tapcore_screen_height(void) { return g_screenH; }
-uint64_t tapcore_sender_id(void)     { return g_senderID; }
+uint64_t tapcore_sender_id(void)     {
+    pthread_mutex_lock(&g_hidLock);
+    uint64_t sid = g_senderID;
+    pthread_mutex_unlock(&g_hidLock);
+    return sid;
+}
+void     tapcore_hid_invalidate(void) {
+    pthread_mutex_lock(&g_hidLock);
+    g_hidLastCheck = 0;
+    pthread_mutex_unlock(&g_hidLock);
+}
 
 void tapcore_set_scripts_dir(NSString *dir) {
     if (dir.length > 0) g_scriptsDir = [dir copy];
@@ -190,7 +202,7 @@ static size_t g_ipcPayloadLen = 0;
 
 // ---------------- Initialization ----------------
 static uint64_t detectDigitizerSenderID(IOHIDEventSystemClientRef client) {
-    uint64_t found = 0;
+    uint64_t hwFound = 0, found = 0;
     CFArrayRef services = p_IOHIDEventSystemClientCopyServices(client);
     if (!services) return 0xDEFACEDBEEFCAFE5ULL;
     CFIndex count = CFArrayGetCount(services);
@@ -207,13 +219,17 @@ static uint64_t detectDigitizerSenderID(IOHIDEventSystemClientRef client) {
             CFNumberGetValue((CFNumberRef)pageRef, kCFNumberIntType, &page);
         if (usageRef && CFGetTypeID(usageRef) == CFNumberGetTypeID())
             CFNumberGetValue((CFNumberRef)usageRef, kCFNumberIntType, &usage);
-        if (page == 0x0D && (usage == 0x04 || usage == 0x05) && sid != 0 && found == 0) {
-            found = sid;
+        if (page == 0x0D && (usage == 0x04 || usage == 0x05) && sid != 0) {
+            if (!found) found = sid;
+            if (!hwFound && sid >= 0x100000000ULL && sid < 0x200000000ULL) {
+                hwFound = sid;
+            }
         }
         if (pageRef) CFRelease(pageRef);
         if (usageRef) CFRelease(usageRef);
     }
     CFRelease(services);
+    if (hwFound) return hwFound;
     return found ? found : 0xDEFACEDBEEFCAFE5ULL;
 }
 
@@ -269,6 +285,7 @@ int tapcore_core_init(void) {
         return -3;
     }
     g_senderID = detectDigitizerSenderID(g_hidClient);
+    g_hidLastCheck = time(NULL);
 
     double w = 1125.0, h_px = 2436.0;
     if (p_MGCopyAnswer) {
@@ -409,6 +426,38 @@ static BOOL dispatchTweakCommand(const char *op, const char *utf8, size_t len, i
 }
 
 // ---------------- HID Touch & Keyboard ----------------
+// Re-detect the digitizer senderID (and reconnect IOHIDEventSystemClient) whenever
+// SpringBoard/backboardd resprings or resets the touchscreen service.
+// Caller MUST hold g_hidLock. Throttled to at most once every 3 s on touchDown.
+static void refreshHIDLocked(BOOL force) {
+    time_t now = time(NULL);
+    if (!force && g_hidClient && g_senderID != 0 && g_senderID != 0xDEFACEDBEEFCAFE5ULL
+        && (now - g_hidLastCheck) < 3) {
+        return;
+    }
+    g_hidLastCheck = now;
+
+    IOHIDEventSystemClientRef probe = p_IOHIDEventSystemClientCreate(kCFAllocatorDefault);
+    if (!probe) return;
+    uint64_t newID = detectDigitizerSenderID(probe);
+    if (newID == 0 || newID == 0xDEFACEDBEEFCAFE5ULL) {
+        CFRelease(probe);
+        return;
+    }
+    if (!g_hidClient || newID != g_senderID) {
+        uint64_t oldID = g_senderID;
+        if (g_hidClient) CFRelease(g_hidClient);
+        g_hidClient = probe;
+        g_senderID = newID;
+        if (oldID != 0 && oldID != newID) {
+            tapcore_log("HID", "Digitizer senderID updated: 0x%llx -> 0x%llx",
+                        (unsigned long long)oldID, (unsigned long long)newID);
+        }
+    } else {
+        CFRelease(probe);
+    }
+}
+
 static void sendTouchEvent(uint32_t fingerID, double px, double py, int phase) {
     IOHIDFloat nx = px / (double)g_screenW;
     IOHIDFloat ny = py / (double)g_screenH;
@@ -430,8 +479,14 @@ static void sendTouchEvent(uint32_t fingerID, double px, double py, int phase) {
     p_IOHIDEventSetIntegerValue(parent, kIOHIDEventFieldDigitizerIsDisplayIntegrated, 1);
     p_IOHIDEventSetIntegerValue(child, kIOHIDEventFieldDigitizerIsDisplayIntegrated, 1);
     p_IOHIDEventAppendEvent(parent, child, 0);
+
+    pthread_mutex_lock(&g_hidLock);
+    if (phase == 0 || !g_hidClient) {
+        refreshHIDLocked(NO);
+    }
     p_IOHIDEventSetSenderID(parent, g_senderID);
-    p_IOHIDEventSystemClientDispatchEvent(g_hidClient, parent);
+    if (g_hidClient) p_IOHIDEventSystemClientDispatchEvent(g_hidClient, parent);
+    pthread_mutex_unlock(&g_hidLock);
 
     CFRelease(child);
     CFRelease(parent);
@@ -440,8 +495,11 @@ static void sendTouchEvent(uint32_t fingerID, double px, double py, int phase) {
 static void sendHIDKey(uint32_t usagePage, uint32_t usage, Boolean down) {
     IOHIDEventRef ev = p_IOHIDEventCreateKeyboardEvent(
         kCFAllocatorDefault, mach_absolute_time(), usagePage, usage, down, 0);
+    pthread_mutex_lock(&g_hidLock);
+    if (!g_hidClient) refreshHIDLocked(YES);
     if (g_senderID) p_IOHIDEventSetSenderID(ev, g_senderID);
-    p_IOHIDEventSystemClientDispatchEvent(g_hidClient, ev);
+    if (g_hidClient) p_IOHIDEventSystemClientDispatchEvent(g_hidClient, ev);
+    pthread_mutex_unlock(&g_hidLock);
     CFRelease(ev);
 }
 

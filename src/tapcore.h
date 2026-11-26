@@ -24,6 +24,7 @@ void tapcore_core_register_lua(lua_State *L);
 int      tapcore_screen_width(void);
 int      tapcore_screen_height(void);
 uint64_t tapcore_sender_id(void);
+void     tapcore_hid_invalidate(void);
 NSString *tapcore_scripts_dir(void);
 void     tapcore_set_scripts_dir(NSString *dir);
 

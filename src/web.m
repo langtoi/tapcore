@@ -483,6 +483,7 @@ static void handleWebClient(int cfd) {
             }
             if ([op isEqualToString:@"respring"]) {
                 tapcore_log("SYS", "Respring requested...");
+                tapcore_hid_invalidate();
                 sendJSON(cfd, 200, @{@"success": @YES, @"op": @"respring", @"message": @"Respringing SpringBoard"});
                 dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
                     usleep(250000);
