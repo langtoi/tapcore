@@ -1,0 +1,19 @@
+Origin: TapCore
+Label: TapCore
+Suite: stable
+Version: 1.0.0
+Codename: ios
+Architectures: iphoneos-arm64
+Components: main
+Description: TapCore - AutoTouch-compatible automation for rootless iOS
+Date: Thu, 26 Nov 2026 14:52:42 UTC
+MD5Sum:
+ 1054b362eddc413c256b403c50427fbe 723 Packages
+ 240d3ac7f9f8c6c7dc70632698f7831e 485 Packages.gz
+ 16a75386ef89d17089e406f24e86698c 537 Packages.bz2
+ 49194503de6df2fa32cc644ad9efe3ff 568 Packages.xz
+SHA256:
+ e754691460f6ced651ea8f4074a22ca6dc21d8f7c9cf463259c40fc5005d0f3e 723 Packages
+ 03928d8dbaf67e2fe7204800a52802c2dbe7b6fc9b78ab3d64da3c409007f7f7 485 Packages.gz
+ 3c58ddbe7495161cf444d7a0839b4e0cd075912a75981b6c3b839610bccb4040 537 Packages.bz2
+ 296c68c2128ebe75f159d2b8c92dcf0ca3595c2e7e84f3f1e9e7cc77e3f243f0 568 Packages.xz

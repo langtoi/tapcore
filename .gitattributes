@@ -1,0 +1,17 @@
+* text=auto
+
+# Scripts run inside WSL / on iOS: must keep LF endings on every checkout
+*.sh            text eol=lf
+packaging/*     text eol=lf
+*.lua           text eol=lf
+VERSION         text eol=lf
+
+# Sileo repo index: byte-exact, hashed in docs/Release
+docs/Packages   -text
+docs/Release    -text
+
+*.deb binary
+*.png binary
+*.gz  binary
+*.bz2 binary
+*.xz  binary

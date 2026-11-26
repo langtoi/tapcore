@@ -1,0 +1,26 @@
+#!/var/jb/bin/sh
+# Runs after files are unpacked.
+export PATH=/var/jb/usr/bin:/var/jb/bin:/var/jb/usr/sbin:/var/jb/sbin:/usr/bin:/bin:/usr/sbin:/sbin
+
+[ "$1" = "configure" ] || exit 0
+
+# User data: scripts stay in the AutoTouch folder so BAS (sv.lua, /control/start_playing) keeps working.
+mkdir -p /var/jb/var/mobile/Library/TapCore \
+         /var/jb/var/mobile/Library/AutoTouch/Scripts/Screenshots
+chown -R mobile:mobile /var/jb/var/mobile/Library/TapCore 2>/dev/null || true
+chown mobile:mobile /var/jb/var/mobile/Library/AutoTouch \
+                    /var/jb/var/mobile/Library/AutoTouch/Scripts \
+                    /var/jb/var/mobile/Library/AutoTouch/Scripts/Screenshots 2>/dev/null || true
+
+# Ship the bundled sv.lua only when the device has none, never overwrite the user's copy.
+if [ ! -f /var/jb/var/mobile/Library/AutoTouch/Scripts/sv.lua ]; then
+    cp /var/jb/usr/share/tapcore/sv.lua /var/jb/var/mobile/Library/AutoTouch/Scripts/sv.lua
+    chown mobile:mobile /var/jb/var/mobile/Library/AutoTouch/Scripts/sv.lua 2>/dev/null || true
+fi
+
+rm -f /tmp/tapcore.port
+launchctl bootstrap system /var/jb/Library/LaunchDaemons/com.tapcore.daemon.plist >/dev/null 2>&1 || \
+    launchctl load -w /var/jb/Library/LaunchDaemons/com.tapcore.daemon.plist >/dev/null 2>&1 || true
+
+uicache -p /var/jb/Applications/TapCore.app >/dev/null 2>&1 || true
+exit 0

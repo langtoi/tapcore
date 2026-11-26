@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>TapCore · iOS Automation</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Crect width=%2764%27 height=%2764%27 rx=%2715%27 fill=%27%230f172a%27/%3E%3Ccircle cx=%2732%27 cy=%2732%27 r=%2722%27 fill=%27none%27 stroke=%27%2322d3ee%27 stroke-width=%275%27/%3E%3Ccircle cx=%2732%27 cy=%2732%27 r=%279%27 fill=%27%2334d399%27/%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#090d16;--panel:#111827;--panel2:#182235;--border:#24314a;
+  --text:#e6edf7;--muted:#8899b5;--cyan:#06b6d4;--cyan2:#22d3ee;
+  --indigo:#6366f1;--green:#10b981;--red:#f43f5e;--amber:#f59e0b;
+  --mono:"SF Mono","JetBrains Mono","Fira Code",Consolas,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:13px;overflow:hidden}
+button{font:inherit;cursor:pointer;border:1px solid var(--border);background:var(--panel2);color:var(--text);border-radius:8px;padding:6px 12px;transition:.15s}
+button:hover{border-color:var(--cyan);color:#fff}
+button.primary{background:linear-gradient(135deg,#0891b2,#4f46e5);border-color:transparent;color:#fff;font-weight:600}
+button.primary:hover{filter:brightness(1.12)}
+button.danger{background:rgba(244,63,94,.16);border-color:rgba(244,63,94,.5);color:#fda4af}
+button.danger:hover{background:var(--red);color:#fff}
+button.success{background:rgba(16,185,129,.16);border-color:rgba(16,185,129,.5);color:#6ee7b7}
+button.success:hover{background:var(--green);color:#042f2e}
+button.active{background:rgba(6,182,212,.2);border-color:var(--cyan);color:var(--cyan2)}
+input,select,textarea{background:#0b1220;border:1px solid var(--border);color:var(--text);border-radius:8px;padding:6px 10px;font:inherit;outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--cyan)}
+
+.app{display:grid;grid-template-rows:50px 1fr;height:100vh}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:0 16px;background:var(--panel);border-bottom:1px solid var(--border);gap:12px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:.3px;font-size:15px}
+.brand .logo{width:28px;height:28px;border-radius:8px;box-shadow:0 0 14px rgba(6,182,212,.35);flex-shrink:0}
+.status-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:var(--panel2);border:1px solid var(--border);font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.dot.ok{background:var(--green);box-shadow:0 0 8px var(--green)}
+.dot.run{background:var(--cyan);box-shadow:0 0 8px var(--cyan);animation:pulse 1.3s infinite}
+.dot.rec{background:var(--red);box-shadow:0 0 8px var(--red);animation:pulse .8s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+.body{display:grid;grid-template-columns:196px 1fr;min-height:0}
+.nav{background:var(--panel);border-right:1px solid var(--border);padding:12px 10px;display:flex;flex-direction:column;gap:4px}
+.nav-btn{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;border:1px solid transparent;background:transparent;color:var(--muted);text-align:left;font-weight:500}
+.nav-btn:hover{background:rgba(255,255,255,.03);color:var(--text);border-color:transparent}
+.nav-btn.active{background:rgba(6,182,212,.14);color:var(--cyan2);border-color:rgba(6,182,212,.35)}
+.nav-group{font-size:10.5px;font-weight:700;letter-spacing:.9px;color:#526585;padding:10px 10px 4px;text-transform:uppercase}
+.nav-sep{height:1px;background:var(--border);margin:8px 4px}
+.nav-meta{margin-top:auto;padding:10px;border-radius:10px;background:#0c1322;border:1px solid var(--border);font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.6}
+
+.main{position:relative;overflow:hidden;min-height:0}
+.view{display:none;height:100%;overflow:hidden}
+.view.active{display:flex;flex-direction:column}
+
+/* Studio View */
+.studio-bar{display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--panel);border-bottom:1px solid var(--border);flex-wrap:wrap}
+.studio-split{display:grid;grid-template-columns:1fr 380px;flex:1;min-height:0}
+.canvas-wrap{position:relative;background:#060911;background-image:radial-gradient(#1b263b 1px,transparent 1px);background-size:18px 18px;overflow:auto;display:flex;align-items:flex-start;justify-content:center;padding:16px}
+.canvas-stage{position:relative;display:inline-block;line-height:0;box-shadow:0 14px 40px rgba(0,0,0,.6);border:1px solid var(--border);border-radius:6px;overflow:hidden}
+#screenCanvas{display:block;cursor:crosshair;max-height:calc(100vh - 150px);width:auto;height:auto}
+#overlayCanvas{position:absolute;inset:0;pointer-events:none;width:100%;height:100%}
+.inspector{background:var(--panel);border-left:1px solid var(--border);display:flex;flex-direction:column;min-height:0;overflow:auto;padding:12px;gap:12px}
+.card{background:var(--panel2);border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.card h3{font-size:11.5px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);display:flex;align-items:center;justify-content:space-between}
+.loupe-row{display:flex;gap:12px;align-items:center}
+#loupeCanvas{width:96px;height:96px;border-radius:10px;border:1px solid var(--cyan);background:#000;image-rendering:pixelated;flex-shrink:0}
+.coord-box{font-family:var(--mono);font-size:12px;line-height:1.7;flex:1}
+.swatch{display:inline-block;width:14px;height:14px;border-radius:4px;border:1px solid #fff3;vertical-align:middle;margin-right:6px}
+.code-out{font-family:var(--mono);font-size:11.5px;background:#080d17;border:1px solid var(--border);border-radius:8px;padding:8px;min-height:84px;max-height:180px;overflow:auto;white-space:pre-wrap;word-break:break-all;color:#a5f3fc;width:100%;resize:vertical}
+.list-scroll{max-height:170px;overflow:auto;display:flex;flex-direction:column;gap:4px}
+.row-item{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:6px 8px;border-radius:8px;background:#0c1322;border:1px solid var(--border);font-family:var(--mono);font-size:11.5px;cursor:pointer}
+.row-item:hover{border-color:var(--cyan)}
+.row-item.sel{border-color:var(--cyan);background:rgba(6,182,212,.12)}
+.tag{padding:2px 6px;border-radius:5px;font-size:10.5px;font-family:var(--mono);background:rgba(99,102,241,.2);color:#c7d2fe}
+
+/* Scripts View */
+.scripts-grid{display:grid;grid-template-columns:280px 1fr;flex:1;min-height:0}
+.scripts-list{border-right:1px solid var(--border);background:var(--panel);display:flex;flex-direction:column;min-height:0}
+.scripts-list-head{padding:10px;border-bottom:1px solid var(--border);display:flex;gap:6px}
+.scripts-items{flex:1;overflow:auto;padding:8px;display:flex;flex-direction:column;gap:6px}
+.script-card{padding:10px;border-radius:10px;background:var(--panel2);border:1px solid var(--border);display:flex;flex-direction:column;gap:6px;cursor:pointer}
+.script-card.sel{border-color:var(--cyan);background:rgba(6,182,212,.1)}
+.script-card-top{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.script-name{font-family:var(--mono);font-weight:600;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.editor-pane{display:grid;grid-template-rows:auto 1fr 200px;min-height:0;background:var(--bg)}
+.editor-bar{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--border);gap:8px;flex-wrap:wrap}
+#codeEditor{width:100%;height:100%;border:none;border-radius:0;background:#080c15;color:#dbeafe;font-family:var(--mono);font-size:12.5px;line-height:1.55;padding:12px;resize:none;tab-size:4}
+.console-pane{border-top:1px solid var(--border);background:#070a12;display:flex;flex-direction:column;min-height:0}
+.console-head{display:flex;align-items:center;justify-content:space-between;padding:5px 12px;background:var(--panel);border-bottom:1px solid var(--border);font-size:11.5px;color:var(--muted)}
+#logBox{flex:1;overflow:auto;padding:8px 12px;font-family:var(--mono);font-size:11.5px;line-height:1.5}
+.log-line{white-space:pre-wrap;word-break:break-word}
+.log-ts{color:#64748b;margin-right:6px}
+.log-RUN{color:#34d399}.log-ERR{color:#fb7185}.log-LUA{color:#38bdf8}.log-REC{color:#fbbf24}.log-IMG{color:#c084fc}.log-WEB,.log-SYS,.log-FILE{color:#94a3b8}
+
+/* Recorder & Gallery */
+.pad-view{padding:16px;overflow:auto;display:flex;flex-direction:column;gap:14px;height:100%}
+.gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px}
+.shot-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+.shot-thumb{height:180px;background:#05080f;display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer}
+.shot-thumb img{max-width:100%;max-height:100%;object-fit:contain}
+.shot-meta{padding:8px 10px;display:flex;flex-direction:column;gap:6px}
+.shot-name{font-family:var(--mono);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.toast{position:fixed;bottom:18px;right:18px;background:#0f172a;border:1px solid var(--cyan);color:#e0f2fe;padding:10px 16px;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.5);font-size:12.5px;opacity:0;transform:translateY(10px);transition:.2s;pointer-events:none;z-index:999}
+.toast.show{opacity:1;transform:translateY(0)}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+
+@media (max-width:900px){
+  .body{grid-template-columns:1fr;grid-template-rows:1fr 56px}
+  .nav{order:2;flex-direction:row;border-right:none;border-top:1px solid var(--border);padding:6px;justify-content:space-around}
+  .nav-sep,.nav-meta{display:none}
+  .nav-btn{padding:8px 10px;font-size:12px;justify-content:center}
+  .studio-split{grid-template-columns:1fr;grid-template-rows:52% 48%}
+  .inspector{border-left:none;border-top:1px solid var(--border)}
+  .scripts-grid{grid-template-columns:1fr;grid-template-rows:200px 1fr}
+  .scripts-list{border-right:none;border-bottom:1px solid var(--border)}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="15" fill="#0f172a"/><circle cx="32" cy="32" r="25.5" fill="none" stroke="#6366f1" stroke-width="2.2"/><circle cx="32" cy="32" r="18.5" fill="none" stroke="#3b9fe0" stroke-width="2.6"/><circle cx="32" cy="32" r="11.8" fill="none" stroke="#22d3ee" stroke-width="3"/><circle cx="32" cy="32" r="5.6" fill="#34d399"/></svg>
+      <span>TapCore</span>
+    </div>
+    <div class="status-bar">
+      <span class="pill"><span id="dotConn" class="dot"></span><span id="txtConn">Connecting...</span></span>
+      <span class="pill"><span id="dotRun" class="dot"></span><span id="txtRun">IDLE</span></span>
+      <button id="btnGlobalStop" class="danger" style="display:none" onclick="stopScript()">Stop Script</button>
+      <span id="pillRec" class="pill" style="display:none;border-color:var(--red);color:#fda4af"><span class="dot rec"></span><span id="txtRec">REC 0</span></span>
+    </div>
+  </header>
+
+  <div class="body">
+    <nav class="nav">
+      <div class="nav-group">Automation</div>
+      <button class="nav-btn" data-view="scripts" onclick="switchView('scripts')">Scripts &amp; Log</button>
+      <button class="nav-btn" data-view="recorder" onclick="switchView('recorder')">Touch Recorder</button>
+      <div class="nav-group">Image &amp; Vision</div>
+      <button class="nav-btn active" data-view="studio" onclick="switchView('studio')">Image &amp; Vision</button>
+      <button class="nav-btn" data-view="gallery" onclick="switchView('gallery')">Screenshots</button>
+      <div class="nav-sep"></div>
+      <div class="nav-group">System</div>
+      <button class="nav-btn" data-view="settings" onclick="switchView('settings')">System &amp; API</button>
+      <div class="nav-meta" id="deviceMeta">Screen: --<br>Port: --</div>
+    </nav>
+
+    <main class="main">
+      <!-- 1. IMAGE & VISION STUDIO -->
+      <section id="view-studio" class="view active">
+        <div class="studio-bar">
+          <button class="primary" onclick="captureLive(0)">Capture Screen</button>
+          <button onclick="captureLive(3)">Delay 3s</button>
+          <select id="shotSelect" onchange="loadSavedShot(this.value)" style="max-width:190px">
+            <option value="">-- Open Saved Image --</option>
+          </select>
+          <span style="width:1px;height:22px;background:var(--border)"></span>
+          <button class="mode-btn active" data-mode="color" onclick="setMode('color')">Color / Points</button>
+          <button class="mode-btn" data-mode="crop" onclick="setMode('crop')">Crop Image</button>
+          <button class="mode-btn" data-mode="region" onclick="setMode('region')">Region</button>
+          <button class="mode-btn" data-mode="ocr" onclick="setMode('ocr')">Vision OCR</button>
+          <button class="success" onclick="runLiveOCR()">Run OCR Now</button>
+        </div>
+
+        <div class="studio-split">
+          <div class="canvas-wrap">
+            <div class="canvas-stage" id="canvasStage">
+              <canvas id="screenCanvas" width="375" height="812"></canvas>
+              <canvas id="overlayCanvas" width="375" height="812"></canvas>
+            </div>
+          </div>
+
+          <aside class="inspector">
+            <!-- Loupe & Pixel Info -->
+            <div class="card">
+              <h3>Pixel Loupe (8x) <span id="imgDim" class="tag">--</span></h3>
+              <div class="loupe-row">
+                <canvas id="loupeCanvas" width="96" height="96"></canvas>
+                <div class="coord-box">
+                  <div>XY: <b id="curXY">0, 0</b></div>
+                  <div>HEX: <span id="curSwatch" class="swatch"></span><b id="curHex">0x000000</b></div>
+                  <div style="margin-top:6px" class="row">
+                    <button style="padding:3px 8px;font-size:11px" onclick="testRemote('home')">Home</button>
+                    <button style="padding:3px 8px;font-size:11px" onclick="testTapSelected()">Test Tap</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Mode-specific controls: Color / Points -->
+            <div id="panel-color" class="card">
+              <h3>Picked Points <button style="padding:2px 8px;font-size:11px" onclick="clearPoints()">Clear</button></h3>
+              <div id="pointsList" class="list-scroll"><div style="color:var(--muted)">Click on the image to pick 1 color (COLOR) or 2+ points (POINTS).</div></div>
+              <div class="row">
+                <button class="active" style="font-size:11.5px;padding:4px 8px" onclick="setColorFmt('bas')">BAS JSON</button>
+                <button style="font-size:11.5px;padding:4px 8px" onclick="setColorFmt('lua')">Lua Script</button>
+                <button class="primary" style="margin-left:auto;font-size:11.5px;padding:4px 10px" onclick="copyEl('colorOut')">Copy</button>
+              </div>
+              <textarea id="colorOut" class="code-out" readonly></textarea>
+            </div>
+
+            <!-- Mode-specific controls: Crop -->
+            <div id="panel-crop" class="card" style="display:none">
+              <h3>Crop &amp; Save Template</h3>
+              <div class="coord-box">Selection: <b id="cropRectTxt">Drag a box on image</b></div>
+              <div class="row">
+                <input id="cropFilename" placeholder="template_name.png" style="flex:1">
+                <button class="primary" onclick="saveCrop()">Save Crop</button>
+              </div>
+              <div class="row">
+                <span style="color:var(--muted);font-size:11.5px">BAS / Lua Output</span>
+                <button class="primary" style="margin-left:auto;font-size:11.5px;padding:4px 10px" onclick="copyEl('cropOut')">Copy</button>
+              </div>
+              <textarea id="cropOut" class="code-out" readonly></textarea>
+            </div>
+
+            <!-- Mode-specific controls: Region -->
+            <div id="panel-region" class="card" style="display:none">
+              <h3>Region Selector</h3>
+              <div class="coord-box">Box: <b id="regRectTxt">Drag on image</b></div>
+              <div class="row">
+                <button class="primary" style="font-size:11.5px;padding:4px 10px" onclick="copyEl('regJsonOut')">Copy JSON</button>
+                <button style="font-size:11.5px;padding:4px 10px" onclick="copyEl('regLuaOut')">Copy Lua</button>
+              </div>
+              <textarea id="regJsonOut" class="code-out" style="min-height:60px" readonly></textarea>
+              <textarea id="regLuaOut" class="code-out" style="min-height:42px" readonly></textarea>
+            </div>
+
+            <!-- Mode-specific controls: Vision OCR -->
+            <div id="panel-ocr" class="card" style="display:none">
+              <h3>Vision OCR <span id="ocrStats" class="tag">0 items</span></h3>
+              <div class="row">
+                <button class="success" style="flex:1" onclick="runLiveOCR(false)">Full Screen OCR</button>
+                <button style="flex:1" onclick="runLiveOCR(true)">OCR Selected Box</button>
+              </div>
+              <input id="ocrFilter" placeholder="Filter recognized text..." oninput="renderOCRList()">
+              <div id="ocrList" class="list-scroll"></div>
+              <div class="row">
+                <select id="ocrAction" onchange="updateOCROutput()" style="font-size:11.5px;padding:4px 8px">
+                  <option value="click">click</option>
+                  <option value="check">check</option>
+                  <option value="click3">click3</option>
+                  <option value="hold">hold</option>
+                </select>
+                <button style="font-size:11.5px;padding:4px 8px" onclick="testSelectedOCR()">Test Tap</button>
+                <button class="primary" style="margin-left:auto;font-size:11.5px;padding:4px 10px" onclick="copyEl('ocrOut')">Copy BAS JSON</button>
+              </div>
+              <textarea id="ocrOut" class="code-out" readonly></textarea>
+            </div>
+
+            <!-- Quick Text Input -->
+            <div class="card">
+              <h3>Quick Device Input</h3>
+              <div class="row">
+                <input id="quickText" placeholder="Send text to iPhone..." style="flex:1" onkeydown="if(event.key==='Enter')sendQuickText()">
+                <button onclick="sendQuickText()">Send</button>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- 2. SCRIPTS & LIVE CONSOLE -->
+      <section id="view-scripts" class="view">
+        <div class="scripts-grid">
+          <div class="scripts-list">
+            <div class="scripts-list-head">
+              <button class="primary" style="flex:1" onclick="newScript()">+ New Lua</button>
+              <button onclick="document.getElementById('luaUpload').click()">Upload</button>
+              <input id="luaUpload" type="file" accept=".lua,.txt" style="display:none" onchange="uploadLuaFile(this)">
+            </div>
+            <div id="scriptsList" class="scripts-items"></div>
+          </div>
+
+          <div class="editor-pane">
+            <div class="editor-bar">
+              <div class="row">
+                <b id="curScriptName" style="font-family:var(--mono);color:var(--cyan2)">Select a script</b>
+              </div>
+              <div class="row">
+                <button onclick="saveCurrentScript()">Save</button>
+                <button class="success" onclick="saveAndRunScript()">Save &amp; Run</button>
+                <button class="danger" onclick="stopScript()">Stop</button>
+              </div>
+            </div>
+            <textarea id="codeEditor" spellcheck="false" placeholder="-- Select or create a .lua script..."></textarea>
+            <div class="console-pane">
+              <div class="console-head">
+                <span>LIVE CONSOLE LOG</span>
+                <button style="padding:2px 8px;font-size:11px" onclick="clearLogs()">Clear</button>
+              </div>
+              <div id="logBox"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. TOUCH RECORDER -->
+      <section id="view-recorder" class="view">
+        <div class="pad-view">
+          <div class="card">
+            <h3>Hardware Touch &amp; Swipe Recorder (IOKit HID)</h3>
+            <p style="color:var(--muted);line-height:1.5">Press <b>Start Recording</b>, perform real taps &amp; swipes directly on your iPhone screen, then press <b>Stop Recording</b> to export exact Lua code or BAS RUNLUA JSON.</p>
+            <div class="row">
+              <button id="btnRecStart" class="primary" onclick="startRecording()">Start Recording</button>
+              <button id="btnRecStop" class="danger" onclick="stopRecording()">Stop Recording</button>
+              <span class="pill">Events: <b id="recCount">0</b></span>
+            </div>
+            <div class="row">
+              <input id="recSaveName" placeholder="rec_swipe.lua" style="width:220px">
+              <button class="success" onclick="saveRecordedScript()">Save to Scripts/</button>
+              <button onclick="copyEl('recLuaOut')">Copy Lua</button>
+              <button class="primary" onclick="copyRecAsBAS()">Copy BAS RUNLUA JSON</button>
+            </div>
+            <textarea id="recLuaOut" class="code-out" style="min-height:320px;max-height:none;flex:1" placeholder="-- Recorded touchDown / touchMove / touchUp / usleep will appear here..."></textarea>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. SCREENSHOTS GALLERY -->
+      <section id="view-gallery" class="view">
+        <div class="pad-view">
+          <div class="row" style="justify-content:space-between">
+            <div class="row">
+              <button class="primary" onclick="captureAndSaveShot(0)">Capture &amp; Save</button>
+              <button onclick="captureAndSaveShot(3)">Capture (3s delay)</button>
+              <button onclick="document.getElementById('imgUpload').click()">Upload Image</button>
+              <input id="imgUpload" type="file" accept="image/png,image/jpeg" style="display:none" onchange="uploadImageFile(this)">
+            </div>
+            <button onclick="refreshGallery()">Refresh</button>
+          </div>
+          <div id="galleryGrid" class="gallery-grid"></div>
+        </div>
+      </section>
+
+      <!-- 5. SYSTEM TOOLS, SETTINGS & FULL API -->
+      <section id="view-settings" class="view">
+        <div class="pad-view" style="max-width:860px">
+          <div class="card">
+            <h3>Device System Tools</h3>
+            <p style="color:var(--muted);line-height:1.45">Quick rootless device maintenance controls (equivalent to terminal <code>uicache -a</code>, <code>sbreload</code>, and reloading the <code>tapcore</code> daemon).</p>
+            <div class="row">
+              <button class="active" onclick="runSystemOp('uicache', false)">Run UICache (-a)</button>
+              <button class="danger" onclick="runSystemOp('respring', true)">Respring SpringBoard</button>
+              <button onclick="runSystemOp('restart_daemon', true)">Restart TapCore daemon</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>Daemon &amp; Runner Settings</h3>
+            <div class="row">
+              <label style="width:180px;color:var(--muted)">Auto-Start on Boot</label>
+              <select id="cfgAutoStart" style="flex:1"></select>
+            </div>
+            <div class="row">
+              <label style="width:180px;color:var(--muted)">Scripts Directory</label>
+              <input id="cfgScriptsDir" style="flex:1;font-family:var(--mono)">
+            </div>
+            <div class="row">
+              <button class="primary" onclick="saveConfig()">Save Settings</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>Complete REST &amp; Lua API Reference <button style="padding:2px 8px;font-size:11px" onclick="copyText(document.getElementById('apiDocs').textContent)">Copy All</button></h3>
+            <pre class="code-out" id="apiDocs" style="min-height:360px;max-height:none"></pre>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+const state = {
+  mode: 'color',
+  colorFmt: 'bas',
+  imgW: 1125, imgH: 2436,
+  imgSource: 'live',
+  points: [],
+  dragStart: null,
+  dragRect: null,
+  ocrItems: [],
+  selectedOCR: null,
+  lastClickXY: null,
+  scripts: [],
+  curScript: null,
+  lastLogId: 0,
+  status: {}
+};
+
+const screenCanvas = document.getElementById('screenCanvas');
+const sctx = screenCanvas.getContext('2d', { willReadFrequently: true });
+const overlayCanvas = document.getElementById('overlayCanvas');
+const octx = overlayCanvas.getContext('2d');
+const loupeCanvas = document.getElementById('loupeCanvas');
+const lctx = loupeCanvas.getContext('2d');
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._tm);
+  t._tm = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+function copyText(txt) {
+  if (!txt) return;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(txt).then(() => toast('Copied to clipboard')).catch(() => fallbackCopy(txt));
+  } else fallbackCopy(txt);
+}
+function fallbackCopy(txt) {
+  const ta = document.createElement('textarea');
+  ta.value = txt; document.body.appendChild(ta); ta.select();
+  document.execCommand('copy'); ta.remove(); toast('Copied to clipboard');
+}
+function copyEl(id) { copyText(document.getElementById(id).value); }
+
+function switchView(name) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.view === name));
+  document.getElementById('view-' + name).classList.add('active');
+  if (name === 'scripts') refreshScripts();
+  if (name === 'gallery') refreshGallery();
+  if (name === 'settings') loadSettingsUI();
+}
+
+function setMode(mode) {
+  state.mode = mode;
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+  ['color','crop','region','ocr'].forEach(m => {
+    document.getElementById('panel-' + m).style.display = (m === mode) ? 'flex' : 'none';
+  });
+  redrawOverlay();
+}
+
+// ---- Canvas Image Loading ----
+function loadImageUrl(url, srcLabel) {
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.onload = () => {
+    state.imgW = img.naturalWidth;
+    state.imgH = img.naturalHeight;
+    state.imgSource = srcLabel;
+    screenCanvas.width = img.naturalWidth;
+    screenCanvas.height = img.naturalHeight;
+    overlayCanvas.width = img.naturalWidth;
+    overlayCanvas.height = img.naturalHeight;
+    sctx.drawImage(img, 0, 0);
+    document.getElementById('imgDim').textContent = img.naturalWidth + 'x' + img.naturalHeight;
+    redrawOverlay();
+    toast('Loaded ' + srcLabel);
+  };
+  img.onerror = () => toast('Failed to load image');
+  img.src = url + (url.includes('?') ? '&' : '?') + '_t=' + Date.now();
+}
+
+function captureLive(delaySec) {
+  toast(delaySec ? `Capturing in ${delaySec}s...` : 'Capturing screen...');
+  loadImageUrl('/api/capture?delay=' + delaySec, 'live');
+}
+
+function loadSavedShot(name) {
+  if (!name) return;
+  loadImageUrl('/api/screenshot/file?name=' + encodeURIComponent(name), name);
+}
+
+// ---- Coordinate Mapping & Pixel Reading ----
+function canvasPoint(ev) {
+  const rect = screenCanvas.getBoundingClientRect();
+  const x = Math.max(0, Math.min(state.imgW - 1, Math.round((ev.clientX - rect.left) * state.imgW / rect.width)));
+  const y = Math.max(0, Math.min(state.imgH - 1, Math.round((ev.clientY - rect.top) * state.imgH / rect.height)));
+  return { x, y };
+}
+
+function getPixelHex(x, y) {
+  const d = sctx.getImageData(x, y, 1, 1).data;
+  const rgb = (d[0] << 16) | (d[1] << 8) | d[2];
+  return '0x' + rgb.toString(16).toUpperCase().padStart(6, '0');
+}
+
+function drawLoupe(x, y) {
+  lctx.imageSmoothingEnabled = false;
+  lctx.fillStyle = '#000';
+  lctx.fillRect(0, 0, 96, 96);
+  lctx.drawImage(screenCanvas, x - 6, y - 6, 12, 12, 0, 0, 96, 96);
+  lctx.strokeStyle = '#22d3ee';
+  lctx.lineWidth = 1.5;
+  lctx.strokeRect(44, 44, 8, 8);
+}
+
+function redrawOverlay() {
+  octx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+
+  // Draw OCR boxes
+  if (state.ocrItems.length && state.mode === 'ocr') {
+    for (const item of state.ocrItems) {
+      const b = item.box;
+      const sel = state.selectedOCR === item;
+      octx.strokeStyle = sel ? '#f43f5e' : '#10b981';
+      octx.lineWidth = sel ? 5 : 3;
+      octx.fillStyle = sel ? 'rgba(244,63,94,0.22)' : 'rgba(16,185,129,0.12)';
+      octx.fillRect(b.x, b.y, b.width, b.height);
+      octx.strokeRect(b.x, b.y, b.width, b.height);
+    }
+  }
+
+  // Draw Drag Rect (Crop / Region / OCR box)
+  if (state.dragRect && (state.mode === 'crop' || state.mode === 'region' || state.mode === 'ocr')) {
+    const r = state.dragRect;
+    octx.strokeStyle = '#22d3ee';
+    octx.lineWidth = 4;
+    octx.fillStyle = 'rgba(6,182,212,0.18)';
+    octx.fillRect(r.x, r.y, r.w, r.h);
+    octx.strokeRect(r.x, r.y, r.w, r.h);
+  }
+
+  // Draw Picked Color Points
+  if (state.points.length && state.mode === 'color') {
+    state.points.forEach((p, idx) => {
+      octx.beginPath();
+      octx.arc(p.x, p.y, 14, 0, Math.PI * 2);
+      octx.strokeStyle = idx === 0 ? '#f43f5e' : '#22d3ee';
+      octx.lineWidth = 4;
+      octx.stroke();
+      octx.fillStyle = idx === 0 ? '#f43f5e' : '#22d3ee';
+      octx.font = 'bold 28px monospace';
+      octx.fillText('#' + (idx + 1), p.x + 18, p.y + 8);
+    });
+  }
+}
+
+screenCanvas.addEventListener('mousemove', ev => {
+  const pt = canvasPoint(ev);
+  const hex = getPixelHex(pt.x, pt.y);
+  document.getElementById('curXY').textContent = pt.x + ', ' + pt.y;
+  document.getElementById('curHex').textContent = hex;
+  document.getElementById('curSwatch').style.background = '#' + hex.slice(2);
+  drawLoupe(pt.x, pt.y);
+
+  if (state.dragStart) {
+    const x = Math.min(state.dragStart.x, pt.x);
+    const y = Math.min(state.dragStart.y, pt.y);
+    const w = Math.abs(pt.x - state.dragStart.x);
+    const h = Math.abs(pt.y - state.dragStart.y);
+    state.dragRect = { x, y, w, h };
+    updateRectOutputs();
+    redrawOverlay();
+  }
+});
+
+screenCanvas.addEventListener('mousedown', ev => {
+  const pt = canvasPoint(ev);
+  state.lastClickXY = pt;
+  if (state.mode === 'color') {
+    const hex = getPixelHex(pt.x, pt.y);
+    state.points.push({ x: pt.x, y: pt.y, hex });
+    renderPoints();
+    redrawOverlay();
+  } else if (state.mode === 'ocr') {
+    // Check if user clicked inside an OCR box first
+    const hit = state.ocrItems.find(it =>
+      pt.x >= it.box.x && pt.x <= it.box.x + it.box.width &&
+      pt.y >= it.box.y && pt.y <= it.box.y + it.box.height
+    );
+    if (hit) {
+      selectOCRItem(hit);
+    } else {
+      state.dragStart = pt;
+      state.dragRect = { x: pt.x, y: pt.y, w: 0, h: 0 };
+    }
+  } else {
+    state.dragStart = pt;
+    state.dragRect = { x: pt.x, y: pt.y, w: 0, h: 0 };
+  }
+});
+
+window.addEventListener('mouseup', () => {
+  if (state.dragStart) {
+    state.dragStart = null;
+    updateRectOutputs();
+    redrawOverlay();
+  }
+});
+
+// ---- Color / Points Generator ----
+function setColorFmt(fmt) {
+  state.colorFmt = fmt;
+  renderPoints();
+}
+function clearPoints() {
+  state.points = [];
+  renderPoints();
+  redrawOverlay();
+}
+function removePoint(i) {
+  state.points.splice(i, 1);
+  renderPoints();
+  redrawOverlay();
+}
+function renderPoints() {
+  const box = document.getElementById('pointsList');
+  if (!state.points.length) {
+    box.innerHTML = '<div style="color:var(--muted)">Click on the image to pick 1 color (COLOR) or 2+ points (POINTS).</div>';
+    document.getElementById('colorOut').value = '';
+    return;
+  }
+  box.innerHTML = state.points.map((p, i) => `
+    <div class="row-item">
+      <span><span class="swatch" style="background:#${p.hex.slice(2)}"></span>${i===0?'BASE':'#'+(i+1)} ${p.hex} (${p.x},${p.y})</span>
+      <button style="padding:1px 6px;font-size:11px" onclick="removePoint(${i})">x</button>
+    </div>
+  `).join('');
+
+  const p0 = state.points[0];
+  if (state.points.length === 1) {
+    const lua = `findColor(${p0.hex}, 0) -- ${p0.hex}, (${p0.x},${p0.y})`;
+    document.getElementById('colorOut').value = state.colorFmt === 'lua' ? lua : JSON.stringify({
+      action: 'COLOR', mode: 'click', timeout: 15, script: lua
+    }, null, 2);
+  } else {
+    const rels = state.points.map(p => `{${p.hex}, ${p.x - p0.x}, ${p.y - p0.y}}`).join(', ');
+    const lua = `findColors({${rels}}, 1)`;
+    const ptsStr = state.points.map(p => `${p.hex}, (${p.x},${p.y})`).join('\n');
+    document.getElementById('colorOut').value = state.colorFmt === 'lua' ? lua : JSON.stringify({
+      action: 'POINTS', mode: 'click', timeout: 5, tolerance: 8, script: ptsStr
+    }, null, 2);
+  }
+}
+
+// ---- Crop & Region Generators ----
+function updateRectOutputs() {
+  const r = state.dragRect;
+  if (!r || r.w <= 0 || r.h <= 0) return;
+  const txt = `x=${r.x}, y=${r.y}, w=${r.w}, h=${r.h}`;
+  document.getElementById('cropRectTxt').textContent = txt;
+  document.getElementById('regRectTxt').textContent = txt;
+  document.getElementById('regJsonOut').value = JSON.stringify({ x: r.x, y: r.y, width: r.w, height: r.h });
+  document.getElementById('regLuaOut').value = `{${r.x}, ${r.y}, ${r.w}, ${r.h}}`;
+}
+
+async function saveCrop() {
+  const r = state.dragRect;
+  if (!r || r.w < 2 || r.h < 2) return toast('Drag a crop rectangle on the image first');
+  let name = document.getElementById('cropFilename').value.trim();
+  if (!name) name = 'crop_' + Date.now() + '.png';
+  if (!name.toLowerCase().endsWith('.png')) name += '.png';
+
+  const res = await fetch('/api/crop', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ source: state.imgSource, x: r.x, y: r.y, width: r.w, height: r.h, save: name })
+  }).then(x => x.json());
+
+  if (!res.success) return toast('Crop failed: ' + (res.error || ''));
+  toast('Saved ' + res.image_path);
+  const pad = 30;
+  const reg = {
+    x: Math.max(0, r.x - pad), y: Math.max(0, r.y - pad),
+    width: Math.min(state.imgW, r.w + pad * 2), height: Math.min(state.imgH, r.h + pad * 2)
+  };
+  document.getElementById('cropOut').value = JSON.stringify({
+    action: 'click', image_path: res.image_path, threshold: 0.9, timeout: 10, region: reg
+  }, null, 2);
+  refreshShotDropdown();
+}
+
+// ---- Vision OCR ----
+async function runLiveOCR(useBox) {
+  setMode('ocr');
+  toast('Running Apple Vision OCR...');
+  // Refresh live screenshot at the same time so overlay matches current screen
+  loadImageUrl('/api/capture', 'live');
+  const payload = { languages: ['en-US'] };
+  if (useBox && state.dragRect && state.dragRect.w > 10 && state.dragRect.h > 10) {
+    payload.region = [state.dragRect.x, state.dragRect.y, state.dragRect.w, state.dragRect.h];
+  }
+  const res = await fetch('/api/ocr', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  }).then(x => x.json());
+
+  if (res.error) return toast('OCR error: ' + res.error);
+  state.ocrItems = res.items || [];
+  state.selectedOCR = state.ocrItems[0] || null;
+  document.getElementById('ocrStats').textContent = `${state.ocrItems.length} items · ${res.elapsed_ms}ms`;
+  renderOCRList();
+  updateOCROutput();
+  redrawOverlay();
+}
+
+function renderOCRList() {
+  const q = document.getElementById('ocrFilter').value.trim().toLowerCase();
+  const list = document.getElementById('ocrList');
+  const filtered = state.ocrItems.filter(it => !q || it.text.toLowerCase().includes(q));
+  list.innerHTML = filtered.map((it, idx) => `
+    <div class="row-item ${state.selectedOCR === it ? 'sel' : ''}" onclick="selectOCRIndex(${state.ocrItems.indexOf(it)})">
+      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(it.text)}</span>
+      <span class="tag">${it.x},${it.y}</span>
+    </div>
+  `).join('') || '<div style="color:var(--muted)">No text items</div>';
+}
+
+function selectOCRIndex(i) { selectOCRItem(state.ocrItems[i]); }
+function selectOCRItem(item) {
+  state.selectedOCR = item;
+  state.lastClickXY = item ? { x: item.x, y: item.y } : null;
+  renderOCRList();
+  updateOCROutput();
+  redrawOverlay();
+}
+
+function updateOCROutput() {
+  const it = state.selectedOCR;
+  if (!it) { document.getElementById('ocrOut').value = ''; return; }
+  const act = document.getElementById('ocrAction').value;
+  const reg = (state.dragRect && state.dragRect.w > 10 && state.dragRect.h > 10)
+    ? { x: state.dragRect.x, y: state.dragRect.y, width: state.dragRect.w, height: state.dragRect.h }
+    : null;
+  document.getElementById('ocrOut').value = JSON.stringify({
+    text: it.text, timeout: 15, ex: true, offset: 0, action: act, region: reg
+  }, null, 2);
+}
+
+// ---- Remote Test Controls ----
+async function testRemote(op, extra = {}) {
+  await fetch('/api/test', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ op, ...extra })
+  });
+  toast('Sent ' + op);
+}
+function testTapSelected() {
+  const pt = state.points[0] || state.lastClickXY;
+  if (!pt) return toast('Click a coordinate on the image first');
+  testRemote('tap', { x: pt.x, y: pt.y });
+}
+function testSelectedOCR() {
+  if (!state.selectedOCR) return toast('Select an OCR item first');
+  testRemote('tap', { x: state.selectedOCR.x, y: state.selectedOCR.y });
+}
+function sendQuickText() {
+  const inp = document.getElementById('quickText');
+  if (!inp.value) return;
+  testRemote('text', { data: inp.value });
+  inp.value = '';
+}
+
+// ---- Scripts CRUD + Runner ----
+async function refreshScripts() {
+  const res = await fetch('/api/scripts').then(x => x.json());
+  state.scripts = res.scripts || [];
+  const box = document.getElementById('scriptsList');
+  box.innerHTML = state.scripts.map(s => `
+    <div class="script-card ${state.curScript === s.path ? 'sel' : ''}" onclick="openScript('${escapeAttr(s.path)}')">
+      <div class="script-card-top">
+        <span class="script-name">${escapeHtml(s.name)}</span>
+        ${s.running ? '<span class="tag" style="background:rgba(16,185,129,.22);color:#6ee7b7">RUNNING</span>' : ''}
+      </div>
+      <div class="row" style="justify-content:space-between">
+        <span style="color:var(--muted);font-size:11px">${(s.size/1024).toFixed(1)} KB</span>
+        <div class="row" onclick="event.stopPropagation()">
+          ${s.running
+            ? `<button class="danger" style="padding:3px 8px;font-size:11px" onclick="stopScript()">Stop</button>`
+            : `<button class="success" style="padding:3px 8px;font-size:11px" onclick="playScript('${escapeAttr(s.path)}')">Play</button>`}
+          <button class="danger" style="padding:3px 8px;font-size:11px" onclick="deleteScript('${escapeAttr(s.path)}')">Del</button>
+        </div>
+      </div>
+    </div>
+  `).join('') || '<div style="color:var(--muted);padding:10px">No .lua scripts yet</div>';
+}
+
+async function openScript(path) {
+  state.curScript = path;
+  document.getElementById('curScriptName').textContent = path;
+  const txt = await fetch('/api/script?path=' + encodeURIComponent(path)).then(x => x.text());
+  document.getElementById('codeEditor').value = txt;
+  refreshScripts();
+}
+
+async function newScript() {
+  let name = prompt('New script filename (e.g. my_auto.lua):', 'script.lua');
+  if (!name) return;
+  if (!name.endsWith('.lua')) name += '.lua';
+  await fetch('/api/script?path=' + encodeURIComponent(name), {
+    method: 'POST', body: '-- ' + name + '\nprint("Hello from TapCore")\n'
+  });
+  await openScript(name);
+  toast('Created ' + name);
+}
+
+async function saveCurrentScript() {
+  if (!state.curScript) return toast('No script selected');
+  const body = document.getElementById('codeEditor').value;
+  const res = await fetch('/api/script?path=' + encodeURIComponent(state.curScript), { method: 'POST', body }).then(x => x.json());
+  if (res.success) toast('Saved ' + state.curScript);
+  refreshScripts();
+}
+
+async function saveAndRunScript() {
+  if (!state.curScript) return toast('No script selected');
+  await saveCurrentScript();
+  await playScript(state.curScript);
+}
+
+async function playScript(path) {
+  const res = await fetch('/api/run?path=' + encodeURIComponent(path), { method: 'POST' }).then(x => x.json());
+  if (res.success) toast('Running ' + path);
+  else toast('Run error: ' + res.error);
+  pollStatus();
+  refreshScripts();
+}
+
+async function stopScript() {
+  await fetch('/api/stop', { method: 'POST' });
+  toast('Stopped script');
+  pollStatus();
+  refreshScripts();
+}
+
+async function deleteScript(path) {
+  if (!confirm('Delete ' + path + '?')) return;
+  await fetch('/api/script?path=' + encodeURIComponent(path), { method: 'DELETE' });
+  if (state.curScript === path) {
+    state.curScript = null;
+    document.getElementById('curScriptName').textContent = 'Select a script';
+    document.getElementById('codeEditor').value = '';
+  }
+  refreshScripts();
+}
+
+async function uploadLuaFile(input) {
+  const f = input.files[0]; if (!f) return;
+  const txt = await f.text();
+  await fetch('/api/script?path=' + encodeURIComponent(f.name), { method: 'POST', body: txt });
+  input.value = '';
+  await openScript(f.name);
+  toast('Uploaded ' + f.name);
+}
+
+// ---- Touch Recorder ----
+async function startRecording() {
+  const res = await fetch('/api/record/start', { method: 'POST' }).then(x => x.json());
+  if (res.success) {
+    document.getElementById('recLuaOut').value = '-- Recording live touches on iPhone...';
+    toast('Recording started — touch/swipe on iPhone now');
+    pollStatus();
+  } else toast('Recorder failed to start');
+}
+
+async function stopRecording() {
+  const res = await fetch('/api/record/stop', { method: 'POST' }).then(x => x.json());
+  document.getElementById('recLuaOut').value = res.lua || '';
+  document.getElementById('recCount').textContent = res.events || 0;
+  toast(`Recorded ${res.events || 0} events`);
+  pollStatus();
+}
+
+async function saveRecordedScript() {
+  const lua = document.getElementById('recLuaOut').value;
+  if (!lua.trim()) return toast('Nothing recorded yet');
+  let name = document.getElementById('recSaveName').value.trim() || ('rec_' + Date.now() + '.lua');
+  if (!name.endsWith('.lua')) name += '.lua';
+  await fetch('/api/script?path=' + encodeURIComponent(name), { method: 'POST', body: lua });
+  toast('Saved ' + name);
+  refreshScripts();
+}
+
+function copyRecAsBAS() {
+  const lua = document.getElementById('recLuaOut').value;
+  if (!lua.trim()) return toast('Nothing recorded yet');
+  copyText(JSON.stringify({ action: 'RUNLUA', data: lua }, null, 2));
+}
+
+// ---- Screenshots Gallery ----
+async function refreshShotDropdown() {
+  const res = await fetch('/api/screenshots').then(x => x.json());
+  const sel = document.getElementById('shotSelect');
+  sel.innerHTML = '<option value="">-- Open Saved Image --</option>' +
+    (res.screenshots || []).map(s => `<option value="${escapeAttr(s.name)}">${escapeHtml(s.name)}</option>`).join('');
+  return res.screenshots || [];
+}
+
+async function refreshGallery() {
+  const shots = await refreshShotDropdown();
+  const grid = document.getElementById('galleryGrid');
+  grid.innerHTML = shots.map(s => `
+    <div class="shot-card">
+      <div class="shot-thumb" onclick="openShotInStudio('${escapeAttr(s.name)}')">
+        <img src="/api/screenshot/file?name=${encodeURIComponent(s.name)}&_t=${s.mtime}" loading="lazy">
+      </div>
+      <div class="shot-meta">
+        <div class="shot-name" title="${escapeAttr(s.name)}">${escapeHtml(s.name)}</div>
+        <div class="row" style="justify-content:space-between">
+          <button style="padding:3px 8px;font-size:11px" onclick="openShotInStudio('${escapeAttr(s.name)}')">Studio</button>
+          <button class="danger" style="padding:3px 8px;font-size:11px" onclick="deleteShot('${escapeAttr(s.name)}')">Del</button>
+        </div>
+      </div>
+    </div>
+  `).join('') || '<div style="color:var(--muted)">No saved screenshots yet.</div>';
+}
+
+function openShotInStudio(name) {
+  switchView('studio');
+  loadSavedShot(name);
+}
+
+async function captureAndSaveShot(delay) {
+  const name = 'shot_' + new Date().toISOString().replace(/[:.T-]/g,'').slice(0,14) + '.png';
+  toast(delay ? `Capturing in ${delay}s...` : 'Capturing...');
+  await fetch(`/api/capture?delay=${delay}&save=${encodeURIComponent(name)}&json=1`);
+  toast('Saved ' + name);
+  refreshGallery();
+}
+
+async function deleteShot(name) {
+  if (!confirm('Delete ' + name + '?')) return;
+  await fetch('/api/screenshot/file?name=' + encodeURIComponent(name), { method: 'DELETE' });
+  refreshGallery();
+}
+
+async function uploadImageFile(input) {
+  const f = input.files[0]; if (!f) return;
+  const buf = await f.arrayBuffer();
+  await fetch('/api/screenshot/upload?name=' + encodeURIComponent(f.name), { method: 'POST', body: buf });
+  input.value = '';
+  toast('Uploaded ' + f.name);
+  refreshGallery();
+}
+
+// ---- Settings ----
+async function loadSettingsUI() {
+  const [st, sc] = await Promise.all([
+    fetch('/api/status').then(x => x.json()),
+    fetch('/api/scripts').then(x => x.json())
+  ]);
+  const sel = document.getElementById('cfgAutoStart');
+  sel.innerHTML = '<option value="">None (Manual start only)</option>' +
+    (sc.scripts || []).map(s => `<option value="${escapeAttr(s.path)}" ${st.auto_start_script===s.path?'selected':''}>${escapeHtml(s.name)}</option>`).join('');
+  document.getElementById('cfgScriptsDir').value = st.scripts_dir || '';
+  const base = `http://${st.ip}:${st.web_port}`;
+  const p3000 = `http://${st.ip}:3000`;
+  document.getElementById('apiDocs').textContent =
+`=== 1. CONTROL & SCRIPT RUNNER (${base}) ===
+GET    ${base}/control/start_playing?path=/sv.lua   # Start any Lua script (BAS compat)
+GET    ${base}/control/stop_playing                 # Stop running script
+GET    ${base}/api/status                           # Daemon & runner status JSON
+POST   ${base}/api/config                           # Update auto_start_script / scripts_dir
+GET    ${base}/api/scripts                          # List all .lua files
+GET    ${base}/api/script?path=sv.lua               # Read script content
+POST   ${base}/api/script?path=my.lua               # Create/save script (raw body)
+DELETE ${base}/api/script?path=my.lua               # Delete script
+POST   ${base}/api/run?path=my.lua                  # Run script
+POST   ${base}/api/stop                             # Stop running script
+GET    ${base}/api/logs?since=0                     # Poll live logs
+POST   ${base}/api/logs/clear                       # Clear logs
+
+=== 2. IMAGE, OCR, RECORDER & SYSTEM TOOLS (${base}) ===
+GET    ${base}/api/capture?delay=0&save=cap.png     # Live PNG screenshot
+POST   ${base}/api/crop                             # {"source":"live","x":0,"y":0,"width":100,"height":100,"save":"a.png"}
+GET    ${base}/api/screenshots                      # List saved images
+GET    ${base}/api/screenshot/file?name=a.png       # Download image
+POST   ${base}/api/screenshot/upload?name=a.png     # Upload image bytes
+DELETE ${base}/api/screenshot/file?name=a.png       # Delete image
+POST   ${base}/api/ocr                              # {"region":[x,y,w,h],"languages":["en-US"]}
+POST   ${base}/api/test                             # {"op":"tap|swipe|home|text|color", ...}
+POST   ${base}/api/record/start                     # Start hardware IOKit touch recorder
+POST   ${base}/api/record/stop?save=rec.lua         # Stop & return recorded Lua
+POST   ${base}/api/system                           # {"op":"uicache" | "respring" | "restart_daemon"}
+
+=== 3. sv.lua AUTOMATION SERVER (${p3000}, when sv.lua is running) ===
+POST   ${p3000}  {"action":"RUNLUA","data":"..."}
+POST   ${p3000}  {"action":"URL","data":"twitter://settings/profile"}
+POST   ${p3000}  {"action":"TEXT","data":"6d2o9h3g1dux"}
+POST   ${p3000}  {"text":"Next","timeout":15,"ex":true,"action":"click","region":null}
+POST   ${p3000}  {"action":"click","image_path":"Screenshots/a.png","threshold":0.9,"timeout":10}
+POST   ${p3000}  {"action":"COLOR","mode":"click","timeout":15,"script":"findColor(0xFFFFFF,0) -- 0xFFFFFF,(500,500)"}
+POST   ${p3000}  {"action":"POINTS","mode":"click","timeout":5,"tolerance":8,"script":"0x00BA7C,(930,387)\\n0xFFFFFF,(1006,387)"}
+POST   ${p3000}  Header X-Action: SAVE_PHOTO + raw JPEG/PNG body
+POST   ${p3000}  {"action":"STOP"}
+
+=== 4. BUILT-IN LUA NATIVE FUNCTIONS (21 APIs) ===
+Touch/Key : touchDown, touchMove, touchUp, usleep, keyDown, keyUp, KEY_TYPE.{HOME_BUTTON,VOLUME_UP_BUTTON,VOLUME_DOWN_BUTTON,POWER_BUTTON}
+Text/Clip : inputText (direct IOKit HID ASCII), copyText
+Vision/Img: getColor, getColors, findColors, ocr, OCR_METHOD.IOS_VISION, findImage
+System    : execute, openURL, appKill, rootDir, saveToSystemAlbum, clearSystemAlbum, print
+Modules   : require("socket"), require("json")`;
+}
+
+async function runSystemOp(op, ask) {
+  const labels = { uicache: 'Run uicache -a?', respring: 'Respring SpringBoard now?', restart_daemon: 'Restart TapCore daemon?' };
+  if (ask && !confirm(labels[op] || ('Run ' + op + '?'))) return;
+  try {
+    const res = await fetch('/api/system', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ op })
+    }).then(x => x.json());
+    toast(res.message || ('Triggered ' + op));
+  } catch {
+    toast('Triggered ' + op);
+  }
+}
+
+async function saveConfig() {
+  const autoStart = document.getElementById('cfgAutoStart').value;
+  const scriptsDir = document.getElementById('cfgScriptsDir').value.trim();
+  const res = await fetch('/api/config', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ auto_start_script: autoStart, scripts_dir: scriptsDir })
+  }).then(x => x.json());
+  if (res.success) toast('Settings saved');
+  else toast('Save failed');
+}
+
+// ---- Polling Status & Live Logs ----
+async function pollStatus() {
+  try {
+    const st = await fetch('/api/status').then(x => x.json());
+    state.status = st;
+    document.getElementById('dotConn').className = 'dot ok';
+    document.getElementById('txtConn').textContent = `${st.ip}:${st.web_port}`;
+    document.getElementById('deviceMeta').innerHTML = `Screen: ${st.screen_w}x${st.screen_h}<br>HID: ${st.sender_id}<br>Web: :${st.web_port}`;
+
+    const dotRun = document.getElementById('dotRun');
+    const txtRun = document.getElementById('txtRun');
+    const btnStop = document.getElementById('btnGlobalStop');
+    if (st.running) {
+      dotRun.className = 'dot run';
+      txtRun.textContent = `RUN ${st.script} (${st.uptime_s}s)`;
+      btnStop.style.display = 'inline-block';
+    } else {
+      dotRun.className = 'dot';
+      txtRun.textContent = 'IDLE';
+      btnStop.style.display = 'none';
+    }
+
+    const pillRec = document.getElementById('pillRec');
+    if (st.recording) {
+      pillRec.style.display = 'inline-flex';
+      document.getElementById('txtRec').textContent = 'REC ' + st.record_events;
+      document.getElementById('recCount').textContent = st.record_events;
+    } else {
+      pillRec.style.display = 'none';
+    }
+  } catch {
+    document.getElementById('dotConn').className = 'dot';
+    document.getElementById('txtConn').textContent = 'Offline';
+  }
+}
+
+async function pollLogs() {
+  try {
+    const res = await fetch('/api/logs?since=' + state.lastLogId).then(x => x.json());
+    const box = document.getElementById('logBox');
+    if (res.logs && res.logs.length) {
+      for (const l of res.logs) {
+        state.lastLogId = Math.max(state.lastLogId, l.id);
+        const div = document.createElement('div');
+        div.className = 'log-line';
+        div.innerHTML = `<span class="log-ts">${l.ts}</span><span class="log-${l.tag}">[${l.tag}]</span> ${escapeHtml(l.msg)}`;
+        box.appendChild(div);
+      }
+      box.scrollTop = box.scrollHeight;
+    }
+  } catch {}
+}
+
+async function clearLogs() {
+  await fetch('/api/logs/clear', { method: 'POST' });
+  document.getElementById('logBox').innerHTML = '';
+}
+
+function escapeHtml(s) { return String(s||'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function escapeAttr(s) { return String(s||'').replace(/['\\]/g, m => '\\' + m); }
+
+// Keyboard shortcuts
+window.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+    if (document.getElementById('view-scripts').classList.contains('active')) {
+      e.preventDefault(); saveCurrentScript();
+    }
+  }
+});
+
+// Init
+pollStatus();
+pollLogs();
+refreshShotDropdown();
+captureLive(0);
+setInterval(pollStatus, 1500);
+setInterval(pollLogs, 1200);
+</script>
+</body>
+</html>

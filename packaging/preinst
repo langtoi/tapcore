@@ -1,0 +1,29 @@
+#!/var/jb/bin/sh
+# Runs before files are unpacked (fresh install and upgrade).
+export PATH=/var/jb/usr/bin:/var/jb/bin:/var/jb/usr/sbin:/var/jb/sbin:/usr/bin:/bin:/usr/sbin:/sbin
+
+# Stop the running TapCore daemon so its binary can be replaced.
+launchctl bootout system/com.tapcore.daemon >/dev/null 2>&1 || true
+
+# One-time migration from the old hand-installed ghost-atd / GhostStudio build.
+if [ -f /var/jb/Library/LaunchDaemons/com.ghost.atd.plist ] || [ -f /var/jb/usr/bin/ghost-atd ]; then
+    launchctl bootout system/com.ghost.atd >/dev/null 2>&1 || \
+        launchctl unload /var/jb/Library/LaunchDaemons/com.ghost.atd.plist >/dev/null 2>&1 || true
+    killall -9 ghost-atd >/dev/null 2>&1 || true
+    if [ -f /var/jb/var/mobile/Library/GhostStudio/config.json ] && \
+       [ ! -f /var/jb/var/mobile/Library/TapCore/config.json ]; then
+        mkdir -p /var/jb/var/mobile/Library/TapCore
+        cp /var/jb/var/mobile/Library/GhostStudio/config.json /var/jb/var/mobile/Library/TapCore/config.json
+    fi
+    if [ -d /var/jb/Applications/GhostStudio.app ]; then
+        uicache -u /var/jb/Applications/GhostStudio.app >/dev/null 2>&1 || true
+    fi
+    rm -f  /var/jb/Library/LaunchDaemons/com.ghost.atd.plist \
+           /var/jb/usr/bin/ghost-atd \
+           /var/jb/Library/MobileSubstrate/DynamicLibraries/ghost_input.dylib \
+           /var/jb/Library/MobileSubstrate/DynamicLibraries/ghost_input.plist \
+           /tmp/ghost-atd.port
+    rm -rf /var/jb/Applications/GhostStudio.app \
+           /var/jb/var/mobile/Library/GhostStudio
+fi
+exit 0

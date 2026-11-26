@@ -1,0 +1,12 @@
+Package: com.tapcore
+Name: TapCore
+Version: @VERSION@
+Architecture: iphoneos-arm64
+Description: AutoTouch-compatible Lua automation runtime for rootless iOS 15-16: HID touch/keys, screen color, Vision OCR, findImage, touch recorder, web studio and app.
+Maintainer: langtoi
+Author: langtoi
+Section: Utilities
+Depends: firmware (>= 15.0)
+Homepage: https://github.com/langtoi/tapcore
+Icon: https://langtoi.github.io/tapcore/icon-512.png
+Depiction: https://langtoi.github.io/tapcore/

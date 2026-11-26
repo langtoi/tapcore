@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TapCore Repo</title>
+<link rel="icon" href="icon-512.png">
+<link rel="apple-touch-icon" href="CydiaIcon.png">
+<style>
+:root{--bg:#090d16;--panel:#111827;--border:#24314a;--text:#e6edf7;--muted:#8899b5;--cyan:#22d3ee;--green:#34d399}
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]){--bg:#f5f7fb;--panel:#ffffff;--border:#d8dee9;--text:#0f172a;--muted:#55657e;--cyan:#0891b2;--green:#059669}}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding:32px 16px}
+main{max-width:620px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+header{display:flex;align-items:center;gap:16px}
+header img{width:72px;height:72px;border-radius:16px}
+h1{font-size:26px}
+.sub{color:var(--muted)}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:10px}
+h2{font-size:16px}
+.btn{display:block;text-align:center;padding:13px;border-radius:12px;background:linear-gradient(135deg,#0891b2,#4f46e5);color:#fff;font-weight:600;text-decoration:none}
+code{font-family:"SF Mono",Consolas,monospace;font-size:13px;background:rgba(127,127,127,.14);padding:2px 6px;border-radius:6px;word-break:break-all}
+ul,ol{padding-left:20px;display:flex;flex-direction:column;gap:4px}
+a{color:var(--cyan)}
+footer{color:var(--muted);font-size:13px;text-align:center}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <img src="icon-512.png" alt="TapCore">
+    <div>
+      <h1>TapCore</h1>
+      <div class="sub">Tự động hoá Lua tương thích AutoTouch cho iOS 15–16 rootless</div>
+    </div>
+  </header>
+
+  <section class="card">
+    <h2>Thêm nguồn vào Sileo</h2>
+    <a class="btn" href="sileo://source/https://langtoi.github.io/tapcore/">Mở Sileo và thêm nguồn</a>
+    <div class="sub">Hoặc thêm thủ công trong Sileo → Sources → + :</div>
+    <code>https://langtoi.github.io/tapcore/</code>
+    <div class="sub">Sau đó tìm <b>TapCore</b> và bấm Get.</div>
+  </section>
+
+  <section class="card">
+    <h2>Sau khi cài</h2>
+    <ul>
+      <li>App <b>TapCore</b> xuất hiện trên màn hình chính.</li>
+      <li>Web Studio: <code>http://&lt;IP iPhone&gt;:8080</code> (cổng 8088 nếu 8080 bận).</li>
+      <li>Script Lua nằm ở <code>/var/jb/var/mobile/Library/AutoTouch/Scripts</code>, chạy <code>sv.lua</code> để mở cổng 3000 cho BAS.</li>
+      <li>Bản cũ ghost-atd / GhostStudio được tự gỡ khi cài.</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>Tính năng</h2>
+    <ul>
+      <li>touchDown/Move/Up, phím cứng, inputText, copyText</li>
+      <li>getColor, getColors, findColors, findImage</li>
+      <li>OCR bằng Apple Vision, ghi thao tác chạm thành Lua</li>
+      <li>execute, openURL, appKill, lưu và xoá ảnh Photos</li>
+    </ul>
+  </section>
+
+  <footer>Mã nguồn: <a href="https://github.com/langtoi/tapcore">github.com/langtoi/tapcore</a></footer>
+</main>
+</body>
+</html>

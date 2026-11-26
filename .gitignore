@@ -1,0 +1,11 @@
+# Build output (the published .deb lives in docs/debs/)
+build/
+
+# Lua 5.3.6 source is downloaded by build.sh
+third_party/
+
+# Local tooling
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db

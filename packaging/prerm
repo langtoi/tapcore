@@ -1,0 +1,12 @@
+#!/var/jb/bin/sh
+# Runs before files are removed (uninstall and upgrade).
+export PATH=/var/jb/usr/bin:/var/jb/bin:/var/jb/usr/sbin:/var/jb/sbin:/usr/bin:/bin:/usr/sbin:/sbin
+
+launchctl bootout system/com.tapcore.daemon >/dev/null 2>&1 || \
+    launchctl unload /var/jb/Library/LaunchDaemons/com.tapcore.daemon.plist >/dev/null 2>&1 || true
+rm -f /tmp/tapcore.port
+
+if [ "$1" = "remove" ] || [ "$1" = "purge" ]; then
+    uicache -u /var/jb/Applications/TapCore.app >/dev/null 2>&1 || true
+fi
+exit 0
