@@ -6,10 +6,16 @@
 #define TAPCORE_CONFIG_DIR   "/var/jb/var/mobile/Library/TapCore"
 #define TAPCORE_WEB_DIR      "/var/jb/usr/share/tapcore/web"
 #define TAPCORE_CONFIG_FILE  "/var/jb/var/mobile/Library/TapCore/config.json"
+#define TAPCORE_SCRIPTS_DIR  "/var/jb/var/mobile/Library/TapCore/Scripts"
 #define TAPCORE_PORT_FILE    "/tmp/tapcore.port"
+
+#ifndef TAPCORE_VERSION
+#define TAPCORE_VERSION "dev"   // build.sh passes the VERSION file
+#endif
 
 // Core init & IPC
 int  tapcore_core_init(void);
+long long tapcore_daemon_started(void);   // unix time the daemon started
 void tapcore_core_start_ipc(void);
 void tapcore_core_register_lua(lua_State *L);
 
@@ -33,7 +39,7 @@ void     tapcore_logs_clear(void);
 // Direct native operations for Web/App Studio REST API
 NSData       *tapcore_capture_png(int *outW, int *outH);
 NSData       *tapcore_crop_png_data(NSData *pngData, int x, int y, int w, int h);
-NSDictionary *tapcore_ocr_dict(BOOL hasRegion, int rx, int ry, int rw, int rh, NSArray<NSString *> *langs);
+NSDictionary *tapcore_ocr_dict(NSDictionary *opts);
 uint32_t      tapcore_read_pixel(int x, int y);
 void          tapcore_exec_tap(double x, double y);
 void          tapcore_exec_swipe(double x1, double y1, double x2, double y2, int steps);

@@ -1,5 +1,7 @@
 #import <Foundation/Foundation.h>
 #import <pthread.h>
+#import <pthread/qos.h>
+#import <mach/mach.h>
 #import <sys/stat.h>
 #import <unistd.h>
 #import <string.h>
@@ -36,7 +38,7 @@ void tapcore_runner_load_config(void) {
             @"fallback_port": @(8088),
             @"web_enabled": @YES,
             @"auto_start_script": @"",
-            @"scripts_dir": @"/var/jb/var/mobile/Library/AutoTouch/Scripts"
+            @"scripts_dir": @TAPCORE_SCRIPTS_DIR
         } mutableCopy];
 
         NSData *data = [NSData dataWithContentsOfFile:@TAPCORE_CONFIG_FILE];
@@ -45,6 +47,11 @@ void tapcore_runner_load_config(void) {
             if ([obj isKindOfClass:[NSDictionary class]]) {
                 [def addEntriesFromDictionary:(NSDictionary *)obj];
             }
+        }
+        NSString *cfgDir = def[@"scripts_dir"];
+        if ([cfgDir isKindOfClass:[NSString class]] &&
+            [[cfgDir stringByResolvingSymlinksInPath] isEqualToString:[@TAPCORE_SCRIPTS_DIR stringByResolvingSymlinksInPath]]) {
+            def[@"scripts_dir"] = @TAPCORE_SCRIPTS_DIR;
         }
         pthread_mutex_lock(&g_runnerLock);
         g_config = def;
@@ -120,6 +127,7 @@ static int l_tapcore_print(lua_State *L) {
 
 static void *scriptWorkerMain(void *arg) {
     NSString *fullPath = (__bridge_transfer NSString *)arg;
+    pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0);
     @autoreleasepool {
         lua_State *L = luaL_newstate();
         if (!L) {
@@ -254,6 +262,14 @@ void tapcore_runner_autostart_if_configured(void) {
     }
 }
 
+// Physical memory footprint of the daemon in MB (what Jetsam counts).
+static double memoryFootprintMB(void) {
+    task_vm_info_data_t info;
+    mach_msg_type_number_t count = TASK_VM_INFO_COUNT;
+    if (task_info(mach_task_self(), TASK_VM_INFO, (task_info_t)&info, &count) != KERN_SUCCESS) return 0;
+    return round(info.phys_footprint / 1048576.0 * 10.0) / 10.0;
+}
+
 NSDictionary *tapcore_runner_status(void) {
     pthread_mutex_lock(&g_runnerLock);
     BOOL running = g_isRunning;
@@ -267,6 +283,9 @@ NSDictionary *tapcore_runner_status(void) {
     double uptime = (running && started > 0) ? (now - started) : 0;
 
     return @{
+        @"version": @TAPCORE_VERSION,
+        @"daemon_started": @(tapcore_daemon_started()),
+        @"memory_mb": @(memoryFootprintMB()),
         @"running": @(running),
         @"script": script,
         @"uptime_s": @((int)uptime),

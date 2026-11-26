@@ -234,6 +234,12 @@ input:focus,select:focus,textarea:focus{border-color:var(--cyan)}
                 <button class="success" style="flex:1" onclick="runLiveOCR(false)">Full Screen OCR</button>
                 <button style="flex:1" onclick="runLiveOCR(true)">OCR Selected Box</button>
               </div>
+              <div class="row">
+                <select id="ocrLevel" style="flex:1;font-size:11.5px;padding:4px 8px">
+                  <option value="fast">Fast</option>
+                  <option value="accurate">Accurate</option>
+                </select>
+              </div>
               <input id="ocrFilter" placeholder="Filter recognized text..." oninput="renderOCRList()">
               <div id="ocrList" class="list-scroll"></div>
               <div class="row">
@@ -675,7 +681,7 @@ async function runLiveOCR(useBox) {
   toast('Running Apple Vision OCR...');
   // Refresh live screenshot at the same time so overlay matches current screen
   loadImageUrl('/api/capture', 'live');
-  const payload = { languages: ['en-US'] };
+  const payload = { languages: ['en-US'], level: document.getElementById('ocrLevel').value };
   if (useBox && state.dragRect && state.dragRect.w > 10 && state.dragRect.h > 10) {
     payload.region = [state.dragRect.x, state.dragRect.y, state.dragRect.w, state.dragRect.h];
   }
@@ -688,7 +694,7 @@ async function runLiveOCR(useBox) {
   if (res.error) return toast('OCR error: ' + res.error);
   state.ocrItems = res.items || [];
   state.selectedOCR = state.ocrItems[0] || null;
-  document.getElementById('ocrStats').textContent = `${state.ocrItems.length} items · ${res.elapsed_ms}ms`;
+  document.getElementById('ocrStats').textContent = `${state.ocrItems.length} items · ${res.level} ${res.elapsed_ms}ms`;
   renderOCRList();
   updateOCROutput();
   redrawOverlay();

@@ -50,7 +50,7 @@ enum {
 #define TAPCORE_IPC_PORT 3001
 #define TAPCORE_NOTIFY_CMD "com.tapcore.cmd"
 
-// Key types matching AutoTouch KEY_TYPE constants
+// KEY_TYPE constants exposed to Lua
 enum {
     TAPCORE_KEY_HOME        = 1,
     TAPCORE_KEY_VOLUME_DOWN = 2,
@@ -121,10 +121,7 @@ NSString *tapcore_scripts_dir(void) {
     if (g_scriptsDir.length > 0) return g_scriptsDir;
     const char *env = getenv("TAPCORE_ROOT_DIR");
     if (env && env[0]) return [NSString stringWithUTF8String:env];
-    struct stat st;
-    if (stat("/var/jb/var/mobile/Library/AutoTouch/Scripts", &st) == 0 && S_ISDIR(st.st_mode))
-        return @"/var/jb/var/mobile/Library/AutoTouch/Scripts";
-    return @"/var/mobile/Library/AutoTouch/Scripts";
+    return @TAPCORE_SCRIPTS_DIR;
 }
 
 void tapcore_log(const char *tag, const char *fmt, ...) {
@@ -220,7 +217,11 @@ static uint64_t detectDigitizerSenderID(IOHIDEventSystemClientRef client) {
     return found ? found : 0xDEFACEDBEEFCAFE5ULL;
 }
 
+static long long g_daemonStarted = 0;
+long long tapcore_daemon_started(void) { return g_daemonStarted; }
+
 int tapcore_core_init(void) {
+    g_daemonStarted = (long long)time(NULL);
     void *h = dlopen("/System/Library/Frameworks/IOKit.framework/IOKit", RTLD_NOW);
     if (!h) {
         fprintf(stderr, "[tapcore] dlopen IOKit failed: %s\n", dlerror());
@@ -796,143 +797,293 @@ static int l_findColors(lua_State *L) {
     return 1;
 }
 
-static int l_ocr(lua_State *L) {
-    @autoreleasepool {
-        BOOL hasRegion = NO;
-        int rx = 0, ry = 0, rw = g_screenW, rh = g_screenH;
-        BOOL useCorrect = YES;
-        NSMutableArray<NSString *> *langs = [NSMutableArray array];
+// ---------------- Vision OCR engine ----------------
+// 1. Under g_surfaceLock: render the screen and copy only the requested region (optionally
+//    downscaled) into a private, reused pixel buffer (a few ms).
+// 2. Release g_surfaceLock, then run Vision on the private copy, so getColor / findColors /
+//    web capture never wait for OCR.
+// Requests are cached per recognition level; g_ocrLock serializes OCR calls.
 
-        if (lua_istable(L, 1)) {
-            lua_getfield(L, 1, "correct");
-            if (lua_isboolean(L, -1)) useCorrect = lua_toboolean(L, -1) ? YES : NO;
-            lua_pop(L, 1);
+typedef struct {
+    BOOL hasRegion;
+    int rx, ry, rw, rh;      // requested region in screen pixels
+    BOOL fast;               // VNRequestTextRecognitionLevelFast instead of Accurate
+    BOOL correct;            // language correction
+    int div;                 // 1 = native resolution, 2 = half, 3 = third
+    double minTextHeight;    // fraction of the image height, 0 = Vision default
+} TCOcrParams;
 
-            lua_getfield(L, 1, "languages");
-            if (lua_istable(L, -1)) {
-                lua_Integer nl = luaL_len(L, -1);
-                for (lua_Integer i = 1; i <= nl; i++) {
-                    lua_rawgeti(L, -1, i);
-                    if (lua_isstring(L, -1)) {
-                        NSString *ls = [NSString stringWithUTF8String:lua_tostring(L, -1)];
-                        if (ls) [langs addObject:ls];
+typedef struct {
+    int screenW, screenH;
+    double captureMs, visionMs;
+} TCOcrStats;
+
+static pthread_mutex_t g_ocrLock = PTHREAD_MUTEX_INITIALIZER;
+static VNRecognizeTextRequest *g_ocrReqFast = nil;
+static VNRecognizeTextRequest *g_ocrReqAccurate = nil;
+static CVPixelBufferRef g_ocrBuf = NULL;
+
+static double msSince(const struct timeval *t0) {
+    struct timeval t1;
+    gettimeofday(&t1, NULL);
+    return (t1.tv_sec - t0->tv_sec) * 1000.0 + (t1.tv_usec - t0->tv_usec) / 1000.0;
+}
+
+// Caller holds g_ocrLock.
+static CVPixelBufferRef ocrBufferOfSize(size_t w, size_t h) {
+    if (g_ocrBuf && CVPixelBufferGetWidth(g_ocrBuf) == w && CVPixelBufferGetHeight(g_ocrBuf) == h) {
+        return g_ocrBuf;
+    }
+    if (g_ocrBuf) {
+        CVPixelBufferRelease(g_ocrBuf);
+        g_ocrBuf = NULL;
+    }
+    NSDictionary *attrs = @{ (__bridge NSString *)kCVPixelBufferIOSurfacePropertiesKey: @{} };
+    CVPixelBufferCreate(kCFAllocatorDefault, w, h, kCVPixelFormatType_32BGRA,
+                        (__bridge CFDictionaryRef)attrs, &g_ocrBuf);
+    return g_ocrBuf;
+}
+
+// Caller holds g_ocrLock. Copies the clamped region into the private buffer.
+// Writes the region actually covered (screen pixels) back into p.
+static CVPixelBufferRef ocrSnapshot(TCOcrParams *p, TCOcrStats *st) {
+    pthread_mutex_lock(&g_surfaceLock);
+    IOSurfaceRef surf = captureScreenLocked();
+    if (!surf) {
+        pthread_mutex_unlock(&g_surfaceLock);
+        return NULL;
+    }
+    IOSurfaceLock(surf, kIOSurfaceLockReadOnly, NULL);
+    int sw = (int)IOSurfaceGetWidth(surf);
+    int sh = (int)IOSurfaceGetHeight(surf);
+    st->screenW = sw;
+    st->screenH = sh;
+
+    int rx = 0, ry = 0, rw = sw, rh = sh;
+    if (p->hasRegion) {
+        rx = p->rx < 0 ? 0 : p->rx;
+        ry = p->ry < 0 ? 0 : p->ry;
+        rw = p->rw;
+        rh = p->rh;
+        if (rx + rw > sw) rw = sw - rx;
+        if (ry + rh > sh) rh = sh - ry;
+    }
+    int div = p->div < 1 ? 1 : (p->div > 3 ? 3 : p->div);
+    int ow = rw / div, oh = rh / div;
+    if (ow < 8 || oh < 8) {               // too small to downscale: use native pixels
+        div = 1;
+        ow = rw;
+        oh = rh;
+    }
+    CVPixelBufferRef pb = (ow > 1 && oh > 1) ? ocrBufferOfSize((size_t)ow, (size_t)oh) : NULL;
+    if (pb) {
+        CVPixelBufferLockBaseAddress(pb, 0);
+        uint8_t *dst = (uint8_t *)CVPixelBufferGetBaseAddress(pb);
+        size_t dbpr = CVPixelBufferGetBytesPerRow(pb);
+        const uint8_t *src = (const uint8_t *)IOSurfaceGetBaseAddress(surf);
+        size_t sbpr = IOSurfaceGetBytesPerRow(surf);
+        if (div == 1) {
+            for (int y = 0; y < oh; y++) {
+                memcpy(dst + (size_t)y * dbpr, src + (size_t)(ry + y) * sbpr + (size_t)rx * 4, (size_t)ow * 4);
+            }
+        } else {
+            // Box filter: average div x div source pixels per output pixel (keeps text edges readable).
+            int n = div * div;
+            for (int y = 0; y < oh; y++) {
+                uint8_t *drow = dst + (size_t)y * dbpr;
+                for (int x = 0; x < ow; x++) {
+                    unsigned b = 0, g = 0, r = 0;
+                    for (int dy = 0; dy < div; dy++) {
+                        const uint8_t *s = src + (size_t)(ry + y * div + dy) * sbpr + (size_t)(rx + x * div) * 4;
+                        for (int dx = 0; dx < div; dx++, s += 4) {
+                            b += s[0]; g += s[1]; r += s[2];
+                        }
                     }
-                    lua_pop(L, 1);
+                    uint8_t *d = drow + (size_t)x * 4;
+                    d[0] = (uint8_t)(b / n); d[1] = (uint8_t)(g / n); d[2] = (uint8_t)(r / n); d[3] = 255;
                 }
             }
-            lua_pop(L, 1);
-
-            lua_getfield(L, 1, "region");
-            if (lua_istable(L, -1)) {
-                lua_rawgeti(L, -1, 1); rx = (int)llround(lua_tonumber(L, -1)); lua_pop(L, 1);
-                lua_rawgeti(L, -1, 2); ry = (int)llround(lua_tonumber(L, -1)); lua_pop(L, 1);
-                lua_rawgeti(L, -1, 3); rw = (int)llround(lua_tonumber(L, -1)); lua_pop(L, 1);
-                lua_rawgeti(L, -1, 4); rh = (int)llround(lua_tonumber(L, -1)); lua_pop(L, 1);
-                hasRegion = YES;
-            }
-            lua_pop(L, 1);
         }
-        if (langs.count == 0) [langs addObject:@"en-US"];
+        CVPixelBufferUnlockBaseAddress(pb, 0);
+    }
+    IOSurfaceUnlock(surf, kIOSurfaceLockReadOnly, NULL);
+    pthread_mutex_unlock(&g_surfaceLock);
 
-        pthread_mutex_lock(&g_surfaceLock);
-        IOSurfaceRef surf = captureScreenLocked();
-        if (!surf) {
-            pthread_mutex_unlock(&g_surfaceLock);
-            return luaL_error(L, "Screen capture failed");
+    p->rx = rx; p->ry = ry;
+    p->rw = ow * div; p->rh = oh * div;   // area really covered by the buffer
+    return pb;
+}
+
+// Runs OCR and returns @[@{text, x, y, w, h, confidence}] in screen pixels (top-left origin),
+// or nil with *errOut set.
+static NSArray<NSDictionary *> *tapcoreRunOCR(TCOcrParams p, NSArray<NSString *> *langs,
+                                              TCOcrStats *st, NSString **errOut) {
+    @autoreleasepool {
+        memset(st, 0, sizeof(*st));
+        pthread_mutex_lock(&g_ocrLock);
+
+        struct timeval t0;
+        gettimeofday(&t0, NULL);
+        CVPixelBufferRef pb = ocrSnapshot(&p, st);
+        st->captureMs = msSince(&t0);
+        if (!pb) {
+            pthread_mutex_unlock(&g_ocrLock);
+            if (p.rw <= 1 || p.rh <= 1) return @[];
+            if (errOut) *errOut = @"Screen capture failed";
+            return nil;
         }
-        int sw = (int)IOSurfaceGetWidth(surf);
-        int sh = (int)IOSurfaceGetHeight(surf);
 
-        VNRecognizeTextRequest *req = [[VNRecognizeTextRequest alloc] initWithCompletionHandler:nil];
-        req.recognitionLevel = VNRequestTextRecognitionLevelAccurate;
-        req.usesLanguageCorrection = useCorrect;
-        req.recognitionLanguages = langs;
+        VNRecognizeTextRequest *req = p.fast ? g_ocrReqFast : g_ocrReqAccurate;
+        if (!req) {
+            req = [[VNRecognizeTextRequest alloc] initWithCompletionHandler:nil];
+            req.recognitionLevel = p.fast ? VNRequestTextRecognitionLevelFast
+                                          : VNRequestTextRecognitionLevelAccurate;
+            if (p.fast) g_ocrReqFast = req; else g_ocrReqAccurate = req;
+        }
+        req.usesLanguageCorrection = p.correct;
+        req.recognitionLanguages = langs.count ? langs : @[@"en-US"];
+        req.minimumTextHeight = (float)(p.minTextHeight > 0 && p.minTextHeight < 1 ? p.minTextHeight : 0);
 
+        gettimeofday(&t0, NULL);
         NSError *err = nil;
-        BOOL ok = NO;
-        double originX = 0.0, originY = 0.0, cropW = (double)sw, cropH = (double)sh;
+        VNImageRequestHandler *handler = [[VNImageRequestHandler alloc] initWithCVPixelBuffer:pb options:@{}];
+        BOOL ok = [handler performRequests:@[req] error:&err];
+        st->visionMs = msSince(&t0);
 
-        if (hasRegion) {
-            if (rx < 0) rx = 0;
-            if (ry < 0) ry = 0;
-            if (rx + rw > sw) rw = sw - rx;
-            if (ry + rh > sh) rh = sh - ry;
-            if (rw <= 1 || rh <= 1) {
-                pthread_mutex_unlock(&g_surfaceLock);
+        NSMutableArray<NSDictionary *> *items = nil;
+        if (ok && !err) {
+            items = [NSMutableArray arrayWithCapacity:req.results.count];
+            double ox = p.rx, oy = p.ry, cw = p.rw, ch = p.rh;
+            for (VNRecognizedTextObservation *obs in req.results) {
+                VNRecognizedText *top = [obs topCandidates:1].firstObject;
+                if (!top) continue;
+                CGRect b = obs.boundingBox;   // normalized, bottom-left origin
+                [items addObject:@{
+                    @"text": top.string ?: @"",
+                    @"x": @(ox + b.origin.x * cw),
+                    @"y": @(oy + (1.0 - (b.origin.y + b.size.height)) * ch),
+                    @"w": @(b.size.width * cw),
+                    @"h": @(b.size.height * ch),
+                    @"confidence": @(top.confidence)
+                }];
+            }
+        } else if (errOut) {
+            *errOut = err ? err.localizedDescription : @"Vision OCR failed";
+        }
+        pthread_mutex_unlock(&g_ocrLock);
+        return items;
+    }
+}
+
+static int luaOptInt(lua_State *L, int tbl, const char *key, int def) {
+    lua_getfield(L, tbl, key);
+    int v = lua_isnumber(L, -1) ? (int)llround(lua_tonumber(L, -1)) : def;
+    lua_pop(L, 1);
+    return v;
+}
+
+// ocr({level = "fast"|"accurate", correct = bool, languages = {...}, region = {x,y,w,h},
+//      scale = 1|0.5|0.33, minTextHeight = 0..1})
+static int l_ocr(lua_State *L) {
+    TCOcrParams p = { .hasRegion = NO, .fast = NO, .correct = YES, .div = 1, .minTextHeight = 0 };
+    NSMutableArray<NSString *> *langs = [NSMutableArray array];
+
+    if (lua_istable(L, 1)) {
+        lua_getfield(L, 1, "level");
+        if (lua_isstring(L, -1)) p.fast = (strcmp(lua_tostring(L, -1), "fast") == 0);
+        lua_pop(L, 1);
+
+        lua_getfield(L, 1, "correct");
+        if (lua_isboolean(L, -1)) p.correct = lua_toboolean(L, -1) ? YES : NO;
+        else if (p.fast) p.correct = NO;
+        lua_pop(L, 1);
+
+        lua_getfield(L, 1, "scale");
+        if (lua_isnumber(L, -1)) {
+            double s = lua_tonumber(L, -1);
+            if (s > 0 && s < 1) p.div = (int)llround(1.0 / s);
+        }
+        lua_pop(L, 1);
+
+        lua_getfield(L, 1, "minTextHeight");
+        if (lua_isnumber(L, -1)) p.minTextHeight = lua_tonumber(L, -1);
+        lua_pop(L, 1);
+
+        lua_getfield(L, 1, "languages");
+        if (lua_istable(L, -1)) {
+            lua_Integer nl = luaL_len(L, -1);
+            for (lua_Integer i = 1; i <= nl; i++) {
+                lua_rawgeti(L, -1, i);
+                if (lua_isstring(L, -1)) {
+                    NSString *ls = [NSString stringWithUTF8String:lua_tostring(L, -1)];
+                    if (ls) [langs addObject:ls];
+                }
+                lua_pop(L, 1);
+            }
+        }
+        lua_pop(L, 1);
+
+        lua_getfield(L, 1, "region");
+        if (lua_istable(L, -1)) {
+            int t = lua_gettop(L);
+            lua_rawgeti(L, t, 1);
+            if (lua_isnumber(L, -1)) {         // {x, y, w, h}
+                lua_pop(L, 1);
+                lua_rawgeti(L, t, 1); p.rx = (int)llround(lua_tonumber(L, -1)); lua_pop(L, 1);
+                lua_rawgeti(L, t, 2); p.ry = (int)llround(lua_tonumber(L, -1)); lua_pop(L, 1);
+                lua_rawgeti(L, t, 3); p.rw = (int)llround(lua_tonumber(L, -1)); lua_pop(L, 1);
+                lua_rawgeti(L, t, 4); p.rh = (int)llround(lua_tonumber(L, -1)); lua_pop(L, 1);
+            } else {                           // {x =, y =, width =, height =}
+                lua_pop(L, 1);
+                p.rx = luaOptInt(L, t, "x", 0);
+                p.ry = luaOptInt(L, t, "y", 0);
+                p.rw = luaOptInt(L, t, "width", 0);
+                p.rh = luaOptInt(L, t, "height", 0);
+            }
+            p.hasRegion = (p.rw > 1 && p.rh > 1);
+            if (!p.hasRegion) {
+                lua_pop(L, 1);
                 lua_newtable(L);
                 return 1;
             }
-            originX = (double)rx;
-            originY = (double)ry;
-            cropW = (double)rw;
-            cropH = (double)rh;
-            // Vision regionOfInterest uses normalized coords with bottom-left origin
-            req.regionOfInterest = CGRectMake(
-                (double)rx / (double)sw,
-                1.0 - (double)(ry + rh) / (double)sh,
-                (double)rw / (double)sw,
-                (double)rh / (double)sh
-            );
         }
-
-        CVPixelBufferRef pb = NULL;
-        CVReturn cvr = CVPixelBufferCreateWithIOSurface(kCFAllocatorDefault, surf, NULL, &pb);
-        if (cvr == kCVReturnSuccess && pb) {
-            VNImageRequestHandler *handler = [[VNImageRequestHandler alloc] initWithCVPixelBuffer:pb options:@{}];
-            ok = [handler performRequests:@[req] error:&err];
-            CVPixelBufferRelease(pb);
-        }
-        pthread_mutex_unlock(&g_surfaceLock);
-
-        if (!ok || err) {
-            return luaL_error(L, "Vision OCR failed: %s",
-                              err ? err.localizedDescription.UTF8String : "unknown");
-        }
-
-        lua_createtable(L, (int)req.results.count, 0);
-        int idx = 0;
-        for (VNRecognizedTextObservation *obs in req.results) {
-            VNRecognizedText *top = [obs topCandidates:1].firstObject;
-            if (!top) continue;
-            idx++;
-            CGRect b = obs.boundingBox;
-            double tlx = originX + b.origin.x * cropW;
-            double tly = originY + (1.0 - (b.origin.y + b.size.height)) * cropH;
-            double trx = originX + (b.origin.x + b.size.width) * cropW;
-            double bly = originY + (1.0 - b.origin.y) * cropH;
-
-            lua_createtable(L, 0, 2);
-            NSData *td = [top.string dataUsingEncoding:NSUTF8StringEncoding];
-            lua_pushlstring(L, (td && td.bytes) ? (const char *)td.bytes : "", td ? td.length : 0);
-            lua_setfield(L, -2, "text");
-
-            lua_createtable(L, 0, 4);
-            // topLeft
-            lua_createtable(L, 0, 2);
-            lua_pushnumber(L, tlx); lua_setfield(L, -2, "x");
-            lua_pushnumber(L, tly); lua_setfield(L, -2, "y");
-            lua_setfield(L, -2, "topLeft");
-            // topRight
-            lua_createtable(L, 0, 2);
-            lua_pushnumber(L, trx); lua_setfield(L, -2, "x");
-            lua_pushnumber(L, tly); lua_setfield(L, -2, "y");
-            lua_setfield(L, -2, "topRight");
-            // bottomLeft
-            lua_createtable(L, 0, 2);
-            lua_pushnumber(L, tlx); lua_setfield(L, -2, "x");
-            lua_pushnumber(L, bly); lua_setfield(L, -2, "y");
-            lua_setfield(L, -2, "bottomLeft");
-            // bottomRight
-            lua_createtable(L, 0, 2);
-            lua_pushnumber(L, trx); lua_setfield(L, -2, "x");
-            lua_pushnumber(L, bly); lua_setfield(L, -2, "y");
-            lua_setfield(L, -2, "bottomRight");
-
-            lua_setfield(L, -2, "rectangle");
-            lua_rawseti(L, -2, idx);
-        }
-        return 1;
+        lua_pop(L, 1);
     }
+
+    TCOcrStats st;
+    NSString *err = nil;
+    NSArray<NSDictionary *> *items = tapcoreRunOCR(p, langs, &st, &err);
+    if (!items) {
+        return luaL_error(L, "Vision OCR failed: %s", err ? err.UTF8String : "unknown");
+    }
+
+    lua_createtable(L, (int)items.count, 0);
+    int idx = 0;
+    for (NSDictionary *it in items) {
+        double x = [it[@"x"] doubleValue], y = [it[@"y"] doubleValue];
+        double x2 = x + [it[@"w"] doubleValue], y2 = y + [it[@"h"] doubleValue];
+
+        lua_createtable(L, 0, 3);
+        NSData *td = [(NSString *)it[@"text"] dataUsingEncoding:NSUTF8StringEncoding];
+        lua_pushlstring(L, (td && td.bytes) ? (const char *)td.bytes : "", td ? td.length : 0);
+        lua_setfield(L, -2, "text");
+        lua_pushnumber(L, [it[@"confidence"] doubleValue]);
+        lua_setfield(L, -2, "confidence");
+
+        lua_createtable(L, 0, 4);
+        const struct { const char *name; double px, py; } corners[4] = {
+            {"topLeft", x, y}, {"topRight", x2, y}, {"bottomLeft", x, y2}, {"bottomRight", x2, y2}
+        };
+        for (int c = 0; c < 4; c++) {
+            lua_createtable(L, 0, 2);
+            lua_pushnumber(L, corners[c].px); lua_setfield(L, -2, "x");
+            lua_pushnumber(L, corners[c].py); lua_setfield(L, -2, "y");
+            lua_setfield(L, -2, corners[c].name);
+        }
+        lua_setfield(L, -2, "rectangle");
+        lua_rawseti(L, -2, ++idx);
+    }
+    return 1;
 }
 
 // ---------------- Template Matching (findImage) ----------------
@@ -1319,7 +1470,7 @@ static int l_clearSystemAlbum(lua_State *L) {
     return 0;
 }
 
-// ---------------- Register all AutoTouch APIs into Lua ----------------
+// ---------------- Register the native API into Lua ----------------
 void tapcore_core_register_lua(lua_State *L) {
     static const luaL_Reg globals[] = {
         {"touchDown",         l_touchDown},
@@ -1449,86 +1600,58 @@ NSData *tapcore_crop_png_data(NSData *pngData, int x, int y, int w, int h) {
     }
 }
 
-NSDictionary *tapcore_ocr_dict(BOOL hasRegion, int rx, int ry, int rw, int rh, NSArray<NSString *> *langs) {
+// REST /api/ocr. opts: region ([x,y,w,h] or {x,y,width,height}), languages, level ("fast"|"accurate"),
+// correct (bool), scale (0.5 = half resolution), min_text_height (0..1).
+NSDictionary *tapcore_ocr_dict(NSDictionary *opts) {
     @autoreleasepool {
-        struct timeval t0, t1;
+        if (![opts isKindOfClass:[NSDictionary class]]) opts = @{};
+        struct timeval t0;
         gettimeofday(&t0, NULL);
 
-        pthread_mutex_lock(&g_surfaceLock);
-        IOSurfaceRef surf = captureScreenLocked();
-        if (!surf) {
-            pthread_mutex_unlock(&g_surfaceLock);
-            return @{@"error": @"Screen capture failed"};
+        TCOcrParams p = { .hasRegion = NO, .fast = NO, .correct = YES, .div = 1, .minTextHeight = 0 };
+        id reg = opts[@"region"];
+        if ([reg isKindOfClass:[NSArray class]] && [(NSArray *)reg count] >= 4) {
+            NSArray *a = (NSArray *)reg;
+            p.rx = [a[0] intValue]; p.ry = [a[1] intValue]; p.rw = [a[2] intValue]; p.rh = [a[3] intValue];
+            p.hasRegion = (p.rw > 1 && p.rh > 1);
+        } else if ([reg isKindOfClass:[NSDictionary class]]) {
+            p.rx = [reg[@"x"] intValue]; p.ry = [reg[@"y"] intValue];
+            p.rw = [reg[@"width"] intValue]; p.rh = [reg[@"height"] intValue];
+            p.hasRegion = (p.rw > 1 && p.rh > 1);
         }
-        int sw = (int)IOSurfaceGetWidth(surf);
-        int sh = (int)IOSurfaceGetHeight(surf);
-
-        VNRecognizeTextRequest *req = [[VNRecognizeTextRequest alloc] initWithCompletionHandler:nil];
-        req.recognitionLevel = VNRequestTextRecognitionLevelAccurate;
-        req.usesLanguageCorrection = YES;
-        req.recognitionLanguages = (langs.count > 0) ? langs : @[@"en-US"];
-
-        double originX = 0.0, originY = 0.0, cropW = (double)sw, cropH = (double)sh;
-        if (hasRegion) {
-            if (rx < 0) rx = 0;
-            if (ry < 0) ry = 0;
-            if (rx + rw > sw) rw = sw - rx;
-            if (ry + rh > sh) rh = sh - ry;
-            if (rw > 1 && rh > 1) {
-                originX = (double)rx;
-                originY = (double)ry;
-                cropW = (double)rw;
-                cropH = (double)rh;
-                req.regionOfInterest = CGRectMake(
-                    (double)rx / (double)sw,
-                    1.0 - (double)(ry + rh) / (double)sh,
-                    (double)rw / (double)sw,
-                    (double)rh / (double)sh);
-            }
+        if ([opts[@"level"] isKindOfClass:[NSString class]]) p.fast = [opts[@"level"] isEqualToString:@"fast"];
+        p.correct = [opts[@"correct"] isKindOfClass:[NSNumber class]] ? [opts[@"correct"] boolValue] : !p.fast;
+        if ([opts[@"scale"] isKindOfClass:[NSNumber class]]) {
+            double s = [opts[@"scale"] doubleValue];
+            if (s > 0 && s < 1) p.div = (int)llround(1.0 / s);
         }
+        if ([opts[@"min_text_height"] isKindOfClass:[NSNumber class]]) p.minTextHeight = [opts[@"min_text_height"] doubleValue];
+        NSArray *langs = [opts[@"languages"] isKindOfClass:[NSArray class]] ? opts[@"languages"] : @[@"en-US"];
 
-        NSError *err = nil;
-        BOOL ok = NO;
-        CVPixelBufferRef pb = NULL;
-        if (CVPixelBufferCreateWithIOSurface(kCFAllocatorDefault, surf, NULL, &pb) == kCVReturnSuccess && pb) {
-            VNImageRequestHandler *handler = [[VNImageRequestHandler alloc] initWithCVPixelBuffer:pb options:@{}];
-            ok = [handler performRequests:@[req] error:&err];
-            CVPixelBufferRelease(pb);
-        }
-        pthread_mutex_unlock(&g_surfaceLock);
+        TCOcrStats st;
+        NSString *err = nil;
+        NSArray<NSDictionary *> *raw = tapcoreRunOCR(p, langs, &st, &err);
+        if (!raw) return @{@"error": err ?: @"OCR failed"};
 
-        gettimeofday(&t1, NULL);
-        double elapsedMs = (t1.tv_sec - t0.tv_sec) * 1000.0 + (t1.tv_usec - t0.tv_usec) / 1000.0;
-
-        if (!ok || err) {
-            return @{@"error": err ? err.localizedDescription : @"OCR failed"};
-        }
-
-        NSMutableArray *items = [NSMutableArray arrayWithCapacity:req.results.count];
-        for (VNRecognizedTextObservation *obs in req.results) {
-            VNRecognizedText *top = [obs topCandidates:1].firstObject;
-            if (!top) continue;
-            CGRect b = obs.boundingBox;
-            double tlx = originX + b.origin.x * cropW;
-            double tly = originY + (1.0 - (b.origin.y + b.size.height)) * cropH;
-            double bw  = b.size.width * cropW;
-            double bh  = b.size.height * cropH;
+        NSMutableArray *items = [NSMutableArray arrayWithCapacity:raw.count];
+        for (NSDictionary *it in raw) {
+            double x = [it[@"x"] doubleValue], y = [it[@"y"] doubleValue];
+            double w = [it[@"w"] doubleValue], h = [it[@"h"] doubleValue];
             [items addObject:@{
-                @"text": top.string ?: @"",
-                @"x": @(round(tlx + bw / 2.0)),
-                @"y": @(round(tly + bh / 2.0)),
-                @"box": @{
-                    @"x": @(round(tlx)),
-                    @"y": @(round(tly)),
-                    @"width": @(round(bw)),
-                    @"height": @(round(bh))
-                }
+                @"text": it[@"text"],
+                @"x": @(round(x + w / 2.0)),
+                @"y": @(round(y + h / 2.0)),
+                @"confidence": @(round([it[@"confidence"] doubleValue] * 100.0) / 100.0),
+                @"box": @{ @"x": @(round(x)), @"y": @(round(y)), @"width": @(round(w)), @"height": @(round(h)) }
             }];
         }
         return @{
-            @"width": @(sw),
-            @"height": @(sh),
-            @"elapsed_ms": @(round(elapsedMs * 10.0) / 10.0),
+            @"width": @(st.screenW),
+            @"height": @(st.screenH),
+            @"level": p.fast ? @"fast" : @"accurate",
+            @"capture_ms": @(round(st.captureMs * 10.0) / 10.0),
+            @"vision_ms": @(round(st.visionMs * 10.0) / 10.0),
+            @"elapsed_ms": @(round(msSince(&t0) * 10.0) / 10.0),
             @"items": items
         };
     }

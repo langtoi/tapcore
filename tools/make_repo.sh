@@ -45,7 +45,7 @@ xz    -9c  Packages > Packages.xz
   echo "Codename: ios"
   echo "Architectures: iphoneos-arm64"
   echo "Components: main"
-  echo "Description: TapCore - AutoTouch-compatible automation for rootless iOS"
+  echo "Description: TapCore - lightweight Lua automation for rootless iOS"
   echo "Date: $(LC_ALL=C date -u '+%a, %d %b %Y %H:%M:%S UTC')"
   echo "MD5Sum:"
   for f in Packages Packages.gz Packages.bz2 Packages.xz; do

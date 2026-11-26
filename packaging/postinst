@@ -4,19 +4,33 @@ export PATH=/var/jb/usr/bin:/var/jb/bin:/var/jb/usr/sbin:/var/jb/sbin:/usr/bin:/
 
 [ "$1" = "configure" ] || exit 0
 
-# User data: scripts stay in the AutoTouch folder so BAS (sv.lua, /control/start_playing) keeps working.
-mkdir -p /var/jb/var/mobile/Library/TapCore \
-         /var/jb/var/mobile/Library/AutoTouch/Scripts/Screenshots
-chown -R mobile:mobile /var/jb/var/mobile/Library/TapCore 2>/dev/null || true
-chown mobile:mobile /var/jb/var/mobile/Library/AutoTouch \
-                    /var/jb/var/mobile/Library/AutoTouch/Scripts \
-                    /var/jb/var/mobile/Library/AutoTouch/Scripts/Screenshots 2>/dev/null || true
+LIB=/var/jb/var/mobile/Library
+SCRIPTS=$LIB/TapCore/Scripts
+LEGACY=$LIB/AutoTouch/Scripts
+mkdir -p "$LIB/TapCore"
 
-# Ship the bundled sv.lua only when the device has none, never overwrite the user's copy.
-if [ ! -f /var/jb/var/mobile/Library/AutoTouch/Scripts/sv.lua ]; then
-    cp /var/jb/usr/share/tapcore/sv.lua /var/jb/var/mobile/Library/AutoTouch/Scripts/sv.lua
-    chown mobile:mobile /var/jb/var/mobile/Library/AutoTouch/Scripts/sv.lua 2>/dev/null || true
+# Move scripts from the legacy folder once, then leave a link there so absolute paths used
+# by existing BAS projects keep working.
+if [ -d "$LEGACY" ] && [ ! -L "$LEGACY" ]; then
+    if [ ! -e "$SCRIPTS" ]; then
+        mv "$LEGACY" "$SCRIPTS"
+    else
+        mv "$LEGACY" "$LEGACY.bak.$(date +%Y%m%d%H%M%S)"
+    fi
 fi
+mkdir -p "$SCRIPTS/Screenshots"
+if [ ! -e "$LEGACY" ] && [ ! -L "$LEGACY" ]; then
+    mkdir -p "$(dirname "$LEGACY")"
+    ln -s "$SCRIPTS" "$LEGACY"
+fi
+
+# Install the bundled sv.lua; keep the previous copy as sv.lua.bak.
+if [ -f "$SCRIPTS/sv.lua" ]; then
+    cp -f "$SCRIPTS/sv.lua" "$SCRIPTS/sv.lua.bak"
+fi
+cp -f /var/jb/usr/share/tapcore/sv.lua "$SCRIPTS/sv.lua"
+
+chown -R mobile:mobile "$LIB/TapCore" 2>/dev/null || true
 
 rm -f /tmp/tapcore.port
 launchctl bootstrap system /var/jb/Library/LaunchDaemons/com.tapcore.daemon.plist >/dev/null 2>&1 || \

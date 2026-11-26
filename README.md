@@ -2,11 +2,11 @@
 
 # TapCore
 
-AutoTouch-compatible Lua automation runtime for jailbroken **rootless iOS 15–16** (Dopamine/Procursus). It does not hook SpringBoard.
+Lightweight Lua automation runtime for jailbroken **rootless iOS 15–16** (Dopamine/Procursus). It does not hook SpringBoard.
 
 - Touch, swipe, hardware keys and typing through IOKit HID
-- Pixel colors, color patterns, template image search, Apple Vision OCR
-- Runs `sv.lua` unmodified for the BAS client (port `3000`)
+- Pixel colors, color patterns, template image search, Apple Vision OCR (Fast ≈ 0.1 s per screen on iPhone X)
+- Ships `sv.lua`, the HTTP command server for the BAS client (port `3000`)
 - Web Studio and the **TapCore** app to manage scripts, capture/crop screenshots, run OCR and record touches
 
 ## Install with Sileo
@@ -20,7 +20,7 @@ Or open https://langtoi.github.io/tapcore/ on the iPhone and tap the add-source 
 After installing:
 - The **TapCore** app appears on the Home Screen.
 - Web Studio: `http://<iphone-ip>:8080` (switches to `8088` when `8080` is busy).
-- Lua scripts live in `/var/jb/var/mobile/Library/AutoTouch/Scripts/`.
+- Lua scripts live in `/var/jb/var/mobile/Library/TapCore/Scripts/`.
 - An older `ghost-atd` / GhostStudio install is removed automatically.
 
 ## Documentation
@@ -41,8 +41,11 @@ If `VERSION` was not bumped, the workflow increases the patch number itself. Run
 Building locally is still possible from the repo root, in Linux/WSL with Theos (`/opt/theos`, iPhoneOS16.5 SDK) and `dpkg-dev`:
 
 ```bash
-bash build.sh             # build + .deb in build/
-bash tools/make_repo.sh   # refresh the Sileo repo in docs/
+bash build.sh                                  # build + .deb in build/
+python tools/remote_install.py <iphone-ip>     # install that .deb on a device already running TapCore
+bash tools/make_repo.sh                        # refresh the Sileo repo in docs/
 ```
+
+`tools/remote_install.py` installs through the daemon's own HTTP API (no SSH), so a test build can be tried on a device before it is pushed.
 
 > Ports 8080 and 3000 have no authentication and the daemon runs as root: use TapCore on a trusted LAN only.

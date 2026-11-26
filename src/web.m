@@ -4,6 +4,7 @@
 #import <ifaddrs.h>
 #import <netinet/in.h>
 #import <pthread.h>
+#import <pthread/qos.h>
 #import <stdio.h>
 #import <stdlib.h>
 #import <string.h>
@@ -183,7 +184,7 @@ static void handleWebClient(int cfd) {
         NSString *shotsDir = [scriptsDir stringByAppendingPathComponent:@"Screenshots"];
         NSFileManager *fm = [NSFileManager defaultManager];
 
-        // ---- 1. AutoTouch / BAS Control Compatibility ----
+        // ---- 1. Script control (used by BAS) ----
         if ([path isEqualToString:@"/control/start_playing"]) {
             NSString *rel = safeRelPath(query[@"path"] ?: @"sv.lua");
             NSDictionary *st = tapcore_runner_status();
@@ -418,21 +419,7 @@ static void handleWebClient(int cfd) {
         // ---- 7. Vision OCR & Direct Live Test ----
         if ([method isEqualToString:@"POST"] && [path isEqualToString:@"/api/ocr"]) {
             NSDictionary *j = body.length ? [NSJSONSerialization JSONObjectWithData:body options:0 error:nil] : @{};
-            BOOL hasReg = NO;
-            int rx = 0, ry = 0, rw = 0, rh = 0;
-            id reg = [j isKindOfClass:[NSDictionary class]] ? j[@"region"] : nil;
-            if ([reg isKindOfClass:[NSArray class]] && [(NSArray *)reg count] >= 4) {
-                NSArray *a = (NSArray *)reg;
-                rx = [a[0] intValue]; ry = [a[1] intValue]; rw = [a[2] intValue]; rh = [a[3] intValue];
-                hasReg = YES;
-            } else if ([reg isKindOfClass:[NSDictionary class]]) {
-                rx = [reg[@"x"] intValue]; ry = [reg[@"y"] intValue];
-                rw = [reg[@"width"] intValue]; rh = [reg[@"height"] intValue];
-                hasReg = (rw > 0 && rh > 0);
-            }
-            NSArray *langs = ([j isKindOfClass:[NSDictionary class]] && [j[@"languages"] isKindOfClass:[NSArray class]])
-                ? j[@"languages"] : @[@"en-US"];
-            NSDictionary *res = tapcore_ocr_dict(hasReg, rx, ry, rw, rh, langs);
+            NSDictionary *res = tapcore_ocr_dict([j isKindOfClass:[NSDictionary class]] ? j : @{});
             sendJSON(cfd, res[@"error"] ? 500 : 200, res);
             return;
         }
@@ -561,6 +548,7 @@ static void handleWebClient(int cfd) {
 
 static void *clientThreadEntry(void *arg) {
     int cfd = (int)(intptr_t)arg;
+    pthread_set_qos_class_self_np(QOS_CLASS_USER_INITIATED, 0);
     handleWebClient(cfd);
     close(cfd);
     return NULL;

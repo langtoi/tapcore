@@ -11,7 +11,7 @@ TapCore exposes **two HTTP ports** and **a set of native Lua functions**:
 
 ## Part 1 — Control & Studio REST API (`http://<IP>:8080` or `:8088`)
 
-### 1.1 AutoTouch / BAS compatible control
+### 1.1 Script control (used by BAS)
 | Method | Endpoint | Description |
 |---|---|---|
 | `GET` | `/control/start_playing?path=/sv.lua` | Run any `.lua` file from the Scripts folder (if that same file is already running, it keeps running and returns `200`) |
@@ -21,7 +21,7 @@ TapCore exposes **two HTTP ports** and **a set of native Lua functions**:
 | Method | Endpoint | Body / Query | Description |
 |---|---|---|---|
 | `GET` | `/` | — | Open the **TapCore Web Studio** in a browser |
-| `GET` | `/api/status` | — | JSON: `ip`, `web_port`, `running`, `script`, `uptime_s`, `last_error`, `screen_w`, `screen_h`, `sender_id`, `recording`, `record_events`, `auto_start_script`, `scripts_dir` |
+| `GET` | `/api/status` | — | JSON: `version`, `daemon_started`, `memory_mb`, `ip`, `web_port`, `running`, `script`, `uptime_s`, `last_error`, `screen_w`, `screen_h`, `sender_id`, `recording`, `record_events`, `auto_start_script`, `scripts_dir` |
 | `POST` | `/api/config` | `{"auto_start_script":"sv.lua","web_port":8080,"fallback_port":8088,"scripts_dir":"..."}` | Update the configuration (set `"auto_start_script":""` to disable auto-start at boot) |
 
 ### 1.3 Live console log
@@ -53,7 +53,7 @@ TapCore exposes **two HTTP ports** and **a set of native Lua functions**:
 ### 1.6 Vision OCR & direct device control (no `sv.lua` needed)
 | Method | Endpoint | Body | Description |
 |---|---|---|---|
-| `POST` | `/api/ocr` | `{"region":[x,y,w,h],"languages":["en-US"]}` *(or `{}`)* | Run Apple Vision OCR, returns `{width, height, elapsed_ms, items:[{text, x, y, box:{x,y,width,height}}]}` |
+| `POST` | `/api/ocr` | `{"level":"fast","region":[x,y,w,h],"languages":["en-US"]}` *(or `{}`)* | Run Apple Vision OCR. Options: `level` `"accurate"` (default) or `"fast"`, `region`, `languages`, `correct` (language correction, default on for accurate), `scale` (e.g. `0.5`), `min_text_height` (0–1). Returns `{width, height, level, capture_ms, vision_ms, elapsed_ms, items:[{text, x, y, confidence, box:{x,y,width,height}}]}` |
 | `POST` | `/api/test` | `{"op":"tap","x":560,"y":1200}` | Tap one point |
 | `POST` | `/api/test` | `{"op":"swipe","x1":950,"y1":1200,"x2":150,"y2":1200,"steps":18}` | Swipe from `(x1,y1)` to `(x2,y2)` |
 | `POST` | `/api/test` | `{"op":"home"}` | Press the Home button |
@@ -85,7 +85,7 @@ Only available while `sv.lua` is running (press **Play** in the app/web, or call
 | **Run arbitrary Lua** | `{"action":"RUNLUA","data":"return execute('/var/jb/usr/bin/x-container list')"}` |
 | **Open URL / deep link** | `{"action":"URL","data":"twitter://settings/profile"}` |
 | **Type text** | `{"action":"TEXT","data":"6d2o9h3g1dux"}` |
-| **Find & tap text (OCR)** | `{"text":"Next","timeout":15,"ex":true,"offset":0,"action":"click","region":null}` *(action: `check`, `click`, `click3`, `hold`)* |
+| **Find & tap text (OCR)** | `{"text":"Next","timeout":15,"ex":true,"offset":0,"action":"click","region":null}` *(action: `check`, `click`, `click3`, `hold`; optional `"level"`: `"auto"` default = Fast passes with an occasional Accurate fallback, or `"fast"` / `"accurate"`)* |
 | **Find & tap a template image** | `{"action":"click","image_path":"Screenshots/btn.png","threshold":0.9,"timeout":10,"region":{"x":0,"y":0,"width":500,"height":500}}` |
 | **Find a color / color pattern** | `{"action":"COLOR","mode":"click","timeout":15,"script":"findColor(0xFFFFFF, 0) -- 0xFFFFFF, (500,500)"}` |
 | **Check multiple anchor points** | `{"action":"POINTS","mode":"click","timeout":5,"tolerance":8,"script":"0x00BA7C, (930,387)\n0xFFFFFF, (1006,387)"}` |
@@ -117,14 +117,16 @@ Call these from any `.lua` file or through `RUNLUA`.
 - `getColor(x, y)` → RGB integer `0xRRGGBB`
 - `getColors({{x1,y1}, {x2,y2}, ...})` → `{rgb1, rgb2, ...}` (one screen capture)
 - `findColors(colors, count, region, debug, rightToLeft, bottomToTop)` → `{{x, y}, ...}`
-- `ocr({method = OCR_METHOD.IOS_VISION, languages = {"en-US"}, correct = true, region = {x,y,w,h}})` → `{{text = "...", rectangle = {topLeft, topRight, bottomLeft, bottomRight}}, ...}`
+- `ocr({level = "fast", languages = {"en-US"}, correct = true, region = {x,y,w,h}, scale = 1, minTextHeight = 0})` → `{{text = "...", confidence = 0..1, rectangle = {topLeft, topRight, bottomLeft, bottomRight}}, ...}`
+  - `level = "accurate"` (default) reads small or stylized text better but takes 2–4 s on iPhone X; `"fast"` takes about 0.1 s.
+  - The screen lock is held only while copying the region (~10 ms), so other screen reads never wait for OCR.
 - `findImage(fullPath, count, threshold, region, debug, method)` → `{{cx, cy}}` (best match only)
 
 ### System, apps & Photos
 - `execute(cmd)` → run a shell command through `/var/jb/bin/sh` (rootless `PATH` preset), returns `stdout+stderr`
 - `openURL(url)` → open a URL / deep link through `LSApplicationWorkspace` (falls back to `uiopen`)
 - `appKill(bundleId)` → force-quit an app (e.g. `appKill("com.burbn.instagram")`)
-- `rootDir()` → current Scripts folder (default `/var/jb/var/mobile/Library/AutoTouch/Scripts`)
+- `rootDir()` → current Scripts folder (default `/var/jb/var/mobile/Library/TapCore/Scripts`)
 - `saveToSystemAlbum(path)` *(aliases: `saveImageToAlbum`, `saveToAlbum`)* → save an image to Photos
 - `clearSystemAlbum()` → delete every photo in the Photos library
 - `print(...)` → print to the **Live Console** of the Web Studio and the TapCore app

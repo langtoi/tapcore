@@ -68,6 +68,8 @@ echo "[2/5] Building tapcore daemon..."
 "$CLANG" "${COMMON_FLAGS[@]}" \
   ${PLATFORM_FLAGS[@]+"${PLATFORM_FLAGS[@]}"} \
   -fobjc-arc \
+  -Wl,-dead_strip \
+  "-DTAPCORE_VERSION=\"$VERSION\"" \
   -I"$LUA_SRC" \
   -I"$DIR/src" \
   -framework Foundation \
@@ -92,6 +94,7 @@ ldid -S"$DIR/entitlements.plist" "$BUILD/tapcore"
 echo "[3/5] Building TapCoreInput.dylib..."
 "$CLANG" "${COMMON_FLAGS[@]}" \
   -dynamiclib \
+  -Wl,-dead_strip \
   ${PLATFORM_FLAGS[@]+"${PLATFORM_FLAGS[@]}"} \
   -Wl,-install_name,/var/jb/Library/MobileSubstrate/DynamicLibraries/TapCoreInput.dylib \
   -fobjc-arc \
@@ -109,6 +112,7 @@ echo "[4/5] Building TapCore.app..."
   -framework Foundation \
   -framework UIKit \
   -framework WebKit \
+  -Wl,-dead_strip \
   -framework AudioToolbox \
   "$DIR/app/main.m" \
   -o "$APP/TapCore"

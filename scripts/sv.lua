@@ -1,5 +1,5 @@
 ----------------------------------------------------------------
--- AutoTouch-compatible HTTP server (port 3000) - compact version
+-- TapCore automation HTTP server (port 3000)
 -- The BAS client (X.xml / X2.xml) only uses:
 --   RUNLUA, URL, TEXT                    -> processCommand
 --   COLOR / findColor (+ script)         -> processColor
@@ -23,11 +23,19 @@ end
 
 ----------------------------------------------------------------
 -- SCREEN TOUCH
--- IMPORTANT: AutoTouch only flushes touchUp to the screen when the script calls usleep.
--- Without a usleep after touchUp the touch stays "stuck" (seen on a test device: click
--- returned 200 but the switch did not toggle until another usleep happened).
+-- TapCore dispatches touch events immediately; the short settle after touchUp only gives
+-- the app time to handle the tap before the next request.
 ----------------------------------------------------------------
 local TOUCH_SETTLE_US = 50000
+local POLL_INTERVAL_S = 0.03   -- pause between two color checks
+
+-- Text search (Vision OCR). Measured on iPhone X: a Fast pass takes ~0.1 s, an Accurate pass
+-- ~2-4 s whatever the region size. So text search runs Fast passes, and only when Fast keeps
+-- missing does it spend one Accurate pass, if enough of the timeout is left for it.
+local OCR_INTERVAL_S       = 0.08  -- pause between two Fast passes
+local OCR_ACCURATE_AFTER_S = 1.5   -- Fast must have missed this long before an Accurate pass
+local OCR_ACCURATE_GAP_S   = 6     -- at most one Accurate pass per this many seconds
+local ocrAccurateCost      = 3.5   -- seconds; updated from the last Accurate pass
 
 local function tap(x, y)
     touchDown(0, x, y)
@@ -56,15 +64,17 @@ local function performAction(x, y, actionType)
     return true
 end
 
--- Call fn() every 200ms until it returns non-nil or the timeout expires (at least once).
-local function poll(timeout, fn)
+-- Call fn(deadline) until it returns non-nil or the timeout expires (at least once),
+-- pausing `interval` seconds (default POLL_INTERVAL_S) between calls.
+local function poll(timeout, fn, interval)
     local deadline = now() + timeout
+    interval = interval or POLL_INTERVAL_S
     while true do
-        local result = fn()
+        local result = fn(deadline)
         if result ~= nil then return result end
         local remaining = deadline - now()
         if remaining <= 0 then return nil end
-        usleep(math.floor(math.min(0.2, remaining) * 1000000) + 1)
+        usleep(math.floor(math.min(interval, remaining) * 1000000) + 1)
     end
 end
 
@@ -181,12 +191,12 @@ end
 ----------------------------------------------------------------
 -- COLOR: read the literals of a findColors / findColor call exported by the
 -- Function Helper. The script is NOT executed as Lua or JS. Accepts:
---   Lua (docs.autotouch.net): findColors({{0xFF0000,0,0},{0x00FF00,10,10}}, 0, {x,y,w,h})
+--   Lua: findColors({{0xFF0000,0,0},{0x00FF00,10,10}}, 0, {x,y,w,h})
 --                             local colors = {...}; findColors(colors, 0, region)
 --                             findColor(0xFFFFFF, 0, {x,y,w,h}) -- 0xFFFFFF, (992,489)
 --   Legacy JS: findColors({colors: [{color: .., x: .., y: ..}], region: {...}})
 ----------------------------------------------------------------
-local function parseAutoTouchFindColorsScript(raw)
+local function parseFindColorsScript(raw)
     if type(raw) ~= "string" or trim(raw) == "" then return nil, "script is empty" end
     if #raw > 262144 then return nil, "script exceeds 256 KiB" end
     local ok, result = pcall(function()
@@ -412,7 +422,7 @@ local function parseAutoTouchFindColorsScript(raw)
 end
 
 local function normalizeColorsFromData(data)
-    local parsed, err = parseAutoTouchFindColorsScript(data.script)
+    local parsed, err = parseFindColorsScript(data.script)
     if not parsed then return nil, nil, err end
     local input = parsed.colors
     if type(input) ~= "table" or #input == 0 then return nil, nil, "colors must be a nonempty array" end
@@ -474,7 +484,7 @@ local function normalizeColorsFromData(data)
     return colors, options
 end
 
--- Call a native AutoTouch function; failure -> error() -> server replies 500.
+-- Call a native TapCore function; failure -> error() -> server replies 500.
 local function nativeCall(name, fn, ...)
     local ok, res, nativeError = pcall(fn, ...)
     if not ok then error(name .. " failed: " .. tostring(res), 0) end
@@ -555,7 +565,7 @@ local function parsePoints(data)
         if not ax or not ay then
             return nil, 'Pasted findColors needs "at": [x, y] = screen position of the first color'
         end
-        local parsed, parseError = parseAutoTouchFindColorsScript(data.script)
+        local parsed, parseError = parseFindColorsScript(data.script)
         if not parsed then return nil, parseError end
         if type(parsed.colors) ~= "table" then return nil, "colors must be a nonempty array" end
         for i, item in ipairs(parsed.colors) do
@@ -740,11 +750,26 @@ local function processSearch(client, data)
         local target = word:gsub("%s+", "")
         -- ex = true/omitted: OCR text equals or ENDS WITH target; ex = false: contains target
         local exact  = data.ex == nil or data.ex == true
-        local opts = {method = OCR_METHOD.IOS_VISION, languages = {"en-US"},
-            correct = true, timeout = 5, debug = DEBUG_MODE, region = region}
+        -- "level": "auto" (default) = Fast passes with an occasional Accurate fallback;
+        -- "fast" / "accurate" force one level for every pass.
+        local mode = type(data.level) == "string" and data.level:lower() or "auto"
+        local started, lastAccurate = now(), -math.huge
 
-        local hit = poll(timeout, function()
-            local ok, results = pcall(ocr, opts)
+        local hit = poll(timeout, function(deadline)
+            local level = mode
+            if level ~= "fast" and level ~= "accurate" then
+                local t = now()
+                if t - started >= OCR_ACCURATE_AFTER_S and t - lastAccurate >= OCR_ACCURATE_GAP_S
+                    and deadline - t >= ocrAccurateCost then
+                    level, lastAccurate = "accurate", t
+                else
+                    level = "fast"
+                end
+            end
+            local t0 = now()
+            local ok, results = pcall(ocr, {level = level, languages = {"en-US"},
+                correct = (level == "accurate"), region = region})
+            if ok and level == "accurate" then ocrAccurateCost = math.max(1, now() - t0) end
             if not ok or type(results) ~= "table" then return nil end
             for _, item in ipairs(results) do
                 local text = item.text or ""
@@ -770,7 +795,7 @@ local function processSearch(client, data)
                 end
             end
             return nil
-        end)
+        end, OCR_INTERVAL_S)
         if not hit then return fail(client, 404, "Not found") end
         performAction(hit[1], hit[2], data.action)
         return respond(client, 200, string.format('{"success":true,"x":%f,"y":%f}', hit[1], hit[2]))
@@ -796,11 +821,8 @@ local function processSavePhoto(client, headers)
 
     local saveFunc = saveToSystemAlbum or saveImageToAlbum or saveToAlbum
     local ok = saveFunc ~= nil and pcall(saveFunc, path)
-    -- AutoTouch only really saves the photo when the script yields (usleep/execute). Deleting
-    -- right away (os.remove) loses the file before Photos reads it -> "Saved" but no photo.
-    -- Keep the old approach: wait a moment, then delete with execute("rm").
-    usleep(300000)
-    execute("rm " .. path)
+    -- saveToSystemAlbum returns after Photos has imported the file, so it can go right away.
+    os.remove(path)
     if not saveFunc then
         respond(client, 500, '{"success":false,"error":"No save function"}')
     elseif ok then
@@ -866,9 +888,8 @@ end
 local function startServer()
     local server = socket.bind("0.0.0.0", PORT)
     if not server then return end
-    -- Same as the old code: NON-blocking accept() + usleep(50ms) when idle. Do NOT switch
-    -- to a blocking accept(): AutoTouch only flushes touches (touchUp) during usleep.
-    server:settimeout(0)
+    -- accept() waits up to 0.5 s and returns the moment a request arrives (no idle polling).
+    server:settimeout(0.5)
 
     local lastRequest = now()
     local dirty = false
@@ -884,7 +905,6 @@ local function startServer()
             lastRequest = now()
             dirty = true
         else
-            usleep(50000)
             if dirty then
                 collectgarbage("collect")   -- collect garbage once after a burst of requests
                 dirty = false
