@@ -1,19 +1,19 @@
 Origin: TapCore
 Label: TapCore
 Suite: stable
-Version: 1.0.1
+Version: 1.0.2
 Codename: ios
 Architectures: iphoneos-arm64
 Components: main
 Description: TapCore - AutoTouch-compatible automation for rootless iOS
-Date: Thu, 26 Nov 2026 15:00:24 UTC
+Date: Thu, 26 Nov 2026 15:13:30 UTC
 MD5Sum:
- ab03fde014f6df719da58aa6f5826dc7 723 Packages
- 2e2e92c424038682d3ecd2bd357f5157 483 Packages.gz
- 57290f9857dbb24e73f4dd9a35b1858a 544 Packages.bz2
- 09c29898faad4f0afddbc060b9ac06b4 568 Packages.xz
+ f1fef986a03cf8f4862b24d2cc01396f 723 Packages
+ a7f1c4cd131f353d16b99a57ce4fd1f0 484 Packages.gz
+ 49d1c146d28e24d37b75f1f34300f06b 539 Packages.bz2
+ 05e6db26a05095aa7223fd608da50855 564 Packages.xz
 SHA256:
- 8b9238c99bd4d95ee58bd1553f69ccbf47c3f47396126ea7f93bae0bd20a5b92 723 Packages
- 1d7e2dcd6d0bfd97f6b57cdcef120eed696984d4a542ce4f64a28f40236705f0 483 Packages.gz
- 9cad5af9f838e07b0458b10a1c35fd95a8a8e6464d393a46973d245cbaad7cc7 544 Packages.bz2
- 815383bc1128df6681a69010ed704bd0ed4849859cd039fc428a62deebd675c5 568 Packages.xz
+ 72df11fa46b500864457afa79afed77ad32bc8261523b0152157ae6d27bc80fe 723 Packages
+ 1c568586a7b8b35929b179620dd9028a12e96e0e6fc0b29fffeec5b64092b320 484 Packages.gz
+ 7deaa31c60cf90399fecb660a3b2ca60cb737ea179658094b7c7c21017790f30 539 Packages.bz2
+ 24748581196b75afbb0fdfc6a710eedfe91b17fb5338417008dccd1ec40a800e 564 Packages.xz
