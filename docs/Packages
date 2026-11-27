@@ -1,6 +1,6 @@
 Package: com.langtoi.ghostrestore
 Name: GhostRestore
-Version: 1.0.4
+Version: 1.0.5
 Architecture: iphoneos-arm64
 Priority: optional
 Section: Utilities
@@ -12,11 +12,11 @@ Installed-Size: 244
 Description: One-tap Instagram & Threads Crane + Ghost backup/restore app (iPhone 8+, iOS 16+).
  Backup & restore paired IG + Threads containers (.ghostpair, .ghostacct, .cranect)
  with full keychain, IDFV, Ghost device profile and Guard snapshot sync.
-Filename: debs/com.langtoi.ghostrestore_1.0.4_iphoneos-arm64.deb
-Size: 72688
-MD5sum: a22e2ade7cd04c25148f8f69f5140609
-SHA1: 76f8ac167bdd88b9f3d19dd1abec325fedd52dfe
-SHA256: 0322d0c9801f9df2efd0c7fef3c583bf07c532bb3b2728d04d279950bbacd28a
+Filename: debs/com.langtoi.ghostrestore_1.0.5_iphoneos-arm64.deb
+Size: 78556
+MD5sum: 0b3c13b4461305ef13fa4b593f01c132
+SHA1: 7fccd8aeeab06fb45b3cbce1408c3d7ed910f555
+SHA256: 7fa1ee3ee3d303ddef1c95ea061cdfb2abe7b65d6f2d99b38843a01002d76e25
 
 Package: com.langtoi.iostoolkit
 Name: Langtoi iOS Toolkit
