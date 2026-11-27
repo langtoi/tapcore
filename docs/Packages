@@ -1,26 +1,26 @@
 Package: com.langtoi.ghostrestore
 Name: GhostRestore
-Version: 1.0.1
+Version: 1.0.2
 Architecture: iphoneos-arm64
 Priority: optional
 Section: Utilities
 Maintainer: Langtoi
 Author: Langtoi
 Homepage: https://github.com/langtoi/tapcore
-Depends: firmware (>= 16.0), com.langtoi.iostoolkit (>= 1.5.17)
+Depends: firmware (>= 16.0), com.langtoi.iostoolkit (>= 1.5.18)
 Installed-Size: 204
 Description: One-tap Crane & Ghost backup/restore app for iOS 16+ (iPhone 8+).
  Pick any .cranect or .ghostacct file from Files, AirDrop or SMB to restore
  container data, keychain, IDFV, Ghost device profile and Guard snapshot.
-Filename: debs/com.langtoi.ghostrestore_1.0.1_iphoneos-arm64.deb
-Size: 61586
-MD5sum: df169bceb2a62278141b866785a3a3c4
-SHA1: f420809bc36d868e541fae4ef24719572e4bef91
-SHA256: 284b28acb14f55765483c68005e113b99754e9816860ae3f5ef6ff1f5a1ce995
+Filename: debs/com.langtoi.ghostrestore_1.0.2_iphoneos-arm64.deb
+Size: 61608
+MD5sum: 71bd3704381b6981ff148a1141827516
+SHA1: ed9fd5aa7750d09f1dbade226fced61fc6c818dc
+SHA256: ea2afbb6d9190b05035733c80170ef419501ab96f37564f9e12adc4af4ca4eef
 
 Package: com.langtoi.iostoolkit
 Name: Langtoi iOS Toolkit
-Version: 1.5.17
+Version: 1.5.18
 Architecture: iphoneos-arm64
 Priority: optional
 Section: Utilities
@@ -34,11 +34,11 @@ Depends: firmware (>= 15.0), com.opa334.crane (>= 1.3.17), ellekit | mobilesubst
 Installed-Size: 2030
 Description: Rootless toolkit for Crane, Ghost and X container switching.
  Includes x-container, crane-restore, ghost guards and session sync tools.
-Filename: debs/com.langtoi.iostoolkit_1.5.17_iphoneos-arm64.deb
-Size: 365264
-MD5sum: df375706d11a3e8820ab2d9a90650c50
-SHA1: 38537e70b8573516e9c6e1a9aa14d62c8f6a6944
-SHA256: f8446f87e56efb664c2f43818b29deb4dcff6eb5535b7a5ed2842578b37d51e2
+Filename: debs/com.langtoi.iostoolkit_1.5.18_iphoneos-arm64.deb
+Size: 365412
+MD5sum: 4f20765ee3ef6238cc53322a2befa562
+SHA1: 5e60cb5a13380738f24415d2cd3158b64aca00eb
+SHA256: 6751f6a0ae552d751eb9e209ac0538521255ce176269ef8c5de70b995873e0f2
 
 Package: com.tapcore
 Name: TapCore
