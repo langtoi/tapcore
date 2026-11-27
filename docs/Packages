@@ -20,7 +20,7 @@ SHA256: 2fde12fec66cd6e22b8a28e7a0fade834328dff4e88c21398c5ef57e985ede1a
 
 Package: com.langtoi.iostoolkit
 Name: Langtoi iOS Toolkit
-Version: 1.5.20
+Version: 1.5.21
 Architecture: iphoneos-arm64
 Priority: optional
 Section: Utilities
@@ -34,11 +34,11 @@ Depends: firmware (>= 15.0), com.opa334.crane (>= 1.3.17), ellekit | mobilesubst
 Installed-Size: 2057
 Description: Rootless toolkit for Crane, Ghost and X container switching.
  Includes x-container, crane-restore, ghost guards and session sync tools.
-Filename: debs/com.langtoi.iostoolkit_1.5.20_iphoneos-arm64.deb
-Size: 369510
-MD5sum: 413836161b0715b42e1bb3881bbf0b6a
-SHA1: def460de6504329eba28cc20a8281191219f56b3
-SHA256: dc92efd61123843592332c69d0b6c13adcc7c65b86de26cb40bc99be4e377069
+Filename: debs/com.langtoi.iostoolkit_1.5.21_iphoneos-arm64.deb
+Size: 372124
+MD5sum: 15a74240b2e965f9f65e4dc0900d1140
+SHA1: 518d2b20ea2294c038b2cb6b2eb293699ba2ec0d
+SHA256: 40bb972482a8ef0f0e4c7abee69abed69ae8da407591a77be4954c041abdd416
 
 Package: com.tapcore
 Name: TapCore
