@@ -1,6 +1,6 @@
 Package: com.langtoi.ghostrestore
 Name: GhostRestore
-Version: 1.0.0
+Version: 1.0.1
 Architecture: iphoneos-arm64
 Priority: optional
 Section: Utilities
@@ -12,11 +12,11 @@ Installed-Size: 204
 Description: One-tap Crane & Ghost backup/restore app for iOS 16+ (iPhone 8+).
  Pick any .cranect or .ghostacct file from Files, AirDrop or SMB to restore
  container data, keychain, IDFV, Ghost device profile and Guard snapshot.
-Filename: debs/com.langtoi.ghostrestore_1.0.0_iphoneos-arm64.deb
-Size: 61638
-MD5sum: f2aa91277b73e355bad1c10c653947ab
-SHA1: 96d71744f425f8b7abcae097cb388941e2cc5dbc
-SHA256: 22d737b6bf8d019fac7b6368b5f20beef6929673296ca8659cd8b77b82277926
+Filename: debs/com.langtoi.ghostrestore_1.0.1_iphoneos-arm64.deb
+Size: 61586
+MD5sum: df169bceb2a62278141b866785a3a3c4
+SHA1: f420809bc36d868e541fae4ef24719572e4bef91
+SHA256: 284b28acb14f55765483c68005e113b99754e9816860ae3f5ef6ff1f5a1ce995
 
 Package: com.langtoi.iostoolkit
 Name: Langtoi iOS Toolkit
