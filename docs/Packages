@@ -1,6 +1,26 @@
+Package: com.langtoi.ghostrestore
+Name: GhostRestore
+Version: 1.0.0
+Architecture: iphoneos-arm64
+Priority: optional
+Section: Utilities
+Maintainer: Langtoi
+Author: Langtoi
+Homepage: https://github.com/langtoi/tapcore
+Depends: firmware (>= 16.0), com.langtoi.iostoolkit (>= 1.5.17)
+Installed-Size: 204
+Description: One-tap Crane & Ghost backup/restore app for iOS 16+ (iPhone 8+).
+ Pick any .cranect or .ghostacct file from Files, AirDrop or SMB to restore
+ container data, keychain, IDFV, Ghost device profile and Guard snapshot.
+Filename: debs/com.langtoi.ghostrestore_1.0.0_iphoneos-arm64.deb
+Size: 61638
+MD5sum: f2aa91277b73e355bad1c10c653947ab
+SHA1: 96d71744f425f8b7abcae097cb388941e2cc5dbc
+SHA256: 22d737b6bf8d019fac7b6368b5f20beef6929673296ca8659cd8b77b82277926
+
 Package: com.langtoi.iostoolkit
 Name: Langtoi iOS Toolkit
-Version: 1.5.16
+Version: 1.5.17
 Architecture: iphoneos-arm64
 Priority: optional
 Section: Utilities
@@ -11,14 +31,14 @@ Replaces: com.langtoi.igghostguard, com.langtoi.threadsghostguard, com.langtoi.r
 Provides: com.langtoi.igghostguard, com.langtoi.threadsghostguard, com.langtoi.redditghostguard, com.langtoi.threadscookie
 Conflicts: com.langtoi.igghostguard, com.langtoi.threadsghostguard, com.langtoi.redditghostguard, com.langtoi.autotouchalertfilter, com.langtoi.threadscookie
 Depends: firmware (>= 15.0), com.opa334.crane (>= 1.3.17), ellekit | mobilesubstrate, python3, sudo, curl, uikittools, shell-cmds, system-cmds, zip, unzip, ldid
-Installed-Size: 1963
+Installed-Size: 2030
 Description: Rootless toolkit for Crane, Ghost and X container switching.
  Includes x-container, crane-restore, ghost guards and session sync tools.
-Filename: debs/com.langtoi.iostoolkit_1.5.16_iphoneos-arm64.deb
-Size: 343932
-MD5sum: d4e75100786e943ace875d5ba4e5a145
-SHA1: 35304edd31bf37b9731268ebaa9d8e8d48f71c1a
-SHA256: 5962df5b58d68616c538546fc2fb6181caf3dd4aa04d5c3183806dc9bdd165d0
+Filename: debs/com.langtoi.iostoolkit_1.5.17_iphoneos-arm64.deb
+Size: 365264
+MD5sum: df375706d11a3e8820ab2d9a90650c50
+SHA1: 38537e70b8573516e9c6e1a9aa14d62c8f6a6944
+SHA256: f8446f87e56efb664c2f43818b29deb4dcff6eb5535b7a5ed2842578b37d51e2
 
 Package: com.tapcore
 Name: TapCore
