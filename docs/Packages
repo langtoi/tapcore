@@ -1,26 +1,26 @@
 Package: com.langtoi.ghostrestore
 Name: GhostRestore
-Version: 1.0.3
+Version: 1.0.4
 Architecture: iphoneos-arm64
 Priority: optional
 Section: Utilities
 Maintainer: Langtoi
 Author: Langtoi
 Homepage: https://github.com/langtoi/tapcore
-Depends: firmware (>= 16.0), com.langtoi.iostoolkit (>= 1.5.19)
-Installed-Size: 224
+Depends: firmware (>= 16.0), com.langtoi.iostoolkit (>= 1.5.22)
+Installed-Size: 244
 Description: One-tap Instagram & Threads Crane + Ghost backup/restore app (iPhone 8+, iOS 16+).
  Backup & restore paired IG + Threads containers (.ghostpair, .ghostacct, .cranect)
  with full keychain, IDFV, Ghost device profile and Guard snapshot sync.
-Filename: debs/com.langtoi.ghostrestore_1.0.3_iphoneos-arm64.deb
-Size: 69826
-MD5sum: 0e4dddcd7dec276a613f35e12059d3b0
-SHA1: ebfc57fe42b42ecd5b778337968069d5a0c59da9
-SHA256: 2fde12fec66cd6e22b8a28e7a0fade834328dff4e88c21398c5ef57e985ede1a
+Filename: debs/com.langtoi.ghostrestore_1.0.4_iphoneos-arm64.deb
+Size: 72688
+MD5sum: a22e2ade7cd04c25148f8f69f5140609
+SHA1: 76f8ac167bdd88b9f3d19dd1abec325fedd52dfe
+SHA256: 0322d0c9801f9df2efd0c7fef3c583bf07c532bb3b2728d04d279950bbacd28a
 
 Package: com.langtoi.iostoolkit
 Name: Langtoi iOS Toolkit
-Version: 1.5.21
+Version: 1.5.22
 Architecture: iphoneos-arm64
 Priority: optional
 Section: Utilities
@@ -31,14 +31,14 @@ Replaces: com.langtoi.igghostguard, com.langtoi.threadsghostguard, com.langtoi.r
 Provides: com.langtoi.igghostguard, com.langtoi.threadsghostguard, com.langtoi.redditghostguard, com.langtoi.threadscookie
 Conflicts: com.langtoi.igghostguard, com.langtoi.threadsghostguard, com.langtoi.redditghostguard, com.langtoi.autotouchalertfilter, com.langtoi.threadscookie
 Depends: firmware (>= 15.0), com.opa334.crane (>= 1.3.17), ellekit | mobilesubstrate, python3, sudo, curl, uikittools, shell-cmds, system-cmds, zip, unzip, ldid
-Installed-Size: 2057
+Installed-Size: 2059
 Description: Rootless toolkit for Crane, Ghost and X container switching.
  Includes x-container, crane-restore, ghost guards and session sync tools.
-Filename: debs/com.langtoi.iostoolkit_1.5.21_iphoneos-arm64.deb
-Size: 372124
-MD5sum: 15a74240b2e965f9f65e4dc0900d1140
-SHA1: 518d2b20ea2294c038b2cb6b2eb293699ba2ec0d
-SHA256: 40bb972482a8ef0f0e4c7abee69abed69ae8da407591a77be4954c041abdd416
+Filename: debs/com.langtoi.iostoolkit_1.5.22_iphoneos-arm64.deb
+Size: 372466
+MD5sum: aa26f396b5db6debf029a7ec241fde19
+SHA1: e21186402bb12e37bb5ee56abcc98d0757a7d568
+SHA256: 4b250618c8cbf6bed87b134fd38350d8c3ace16047065c58bf8ec2fae0b83d1b
 
 Package: com.tapcore
 Name: TapCore
