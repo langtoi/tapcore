@@ -18,6 +18,7 @@ if [ -d "$LEGACY" ] && [ ! -L "$LEGACY" ]; then
         mv "$LEGACY" "$LEGACY.bak.$(date +%Y%m%d%H%M%S)"
     fi
 fi
+mkdir -p "$LIB/TapCore/Data"
 mkdir -p "$SCRIPTS/Screenshots"
 if [ ! -e "$LEGACY" ] && [ ! -L "$LEGACY" ]; then
     mkdir -p "$(dirname "$LEGACY")"

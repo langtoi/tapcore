@@ -4,7 +4,9 @@
 #include "lua.h"
 
 #define TAPCORE_CONFIG_DIR   "/var/jb/var/mobile/Library/TapCore"
+#define TAPCORE_DATA_DIR     "/var/jb/var/mobile/Library/TapCore/Data"
 #define TAPCORE_WEB_DIR      "/var/jb/usr/share/tapcore/web"
+#define TAPCORE_LIB_DIR      "/var/jb/usr/share/tapcore/lib"
 #define TAPCORE_CONFIG_FILE  "/var/jb/var/mobile/Library/TapCore/config.json"
 #define TAPCORE_SCRIPTS_DIR  "/var/jb/var/mobile/Library/TapCore/Scripts"
 #define TAPCORE_PORT_FILE    "/tmp/tapcore.port"
@@ -68,6 +70,12 @@ void          tapcore_runner_autostart_if_configured(void);
 void tapcore_web_start(void);
 int  tapcore_web_active_port(void);
 
-// Lua preloaded modules
-int luaopen_tapcore_socket(lua_State *L);
-int luaopen_tapcore_json(lua_State *L);
+// Lua preloaded modules & native HTTP
+int  luaopen_tapcore_socket(lua_State *L);
+int  luaopen_tapcore_json(lua_State *L);
+int  luaopen_tapcore_http(lua_State *L);
+void tapcore_http_register_lua(lua_State *L);
+
+// Backup Crane (.ghostpair) & upload to panel
+NSDictionary *tapcore_backup_upload_start(NSDictionary *params, BOOL waitForCompletion);
+NSDictionary *tapcore_backup_upload_status(NSString *jobId);

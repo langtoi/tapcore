@@ -82,6 +82,8 @@ echo "[2/5] Building tapcore daemon..."
   -framework Photos \
   "$DIR/src/lua_socket.m" \
   "$DIR/src/lua_json.m" \
+  "$DIR/src/lua_http.m" \
+  "$DIR/src/backup_upload.m" \
   "$DIR/src/core.m" \
   "$DIR/src/runner.m" \
   "$DIR/src/web.m" \
@@ -127,7 +129,7 @@ trap 'rm -rf "$STAGE"' EXIT
 chmod 0755 "$STAGE"
 JB="$STAGE/var/jb"
 install -d "$JB/usr/bin" "$JB/Library/LaunchDaemons" "$JB/Library/MobileSubstrate/DynamicLibraries" \
-           "$JB/Applications/TapCore.app" "$JB/usr/share/tapcore/web" "$STAGE/DEBIAN"
+           "$JB/Applications/TapCore.app" "$JB/usr/share/tapcore/web" "$JB/usr/share/tapcore/lib" "$STAGE/DEBIAN"
 
 install -m 0755 "$BUILD/tapcore"                         "$JB/usr/bin/tapcore"
 install -m 0644 "$DIR/packaging/com.tapcore.daemon.plist" "$JB/Library/LaunchDaemons/com.tapcore.daemon.plist"

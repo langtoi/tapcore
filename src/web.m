@@ -71,6 +71,21 @@ static NSString *safeRelPath(NSString *p) {
     return p;
 }
 
+static NSString *safeDataName(NSString *name) {
+    if (!name.length || name.length > 100) return nil;
+    if ([name containsString:@"/"] || [name containsString:@"\\"] || [name containsString:@".."]) return nil;
+    NSCharacterSet *allowed = [NSCharacterSet characterSetWithCharactersInString:@"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_.-"];
+    if ([name rangeOfCharacterFromSet:[allowed invertedSet]].location != NSNotFound) return nil;
+    return name;
+}
+
+static NSString *safeAppSlug(NSString *slug) {
+    if (!slug.length || slug.length > 64) return nil;
+    NSCharacterSet *allowed = [NSCharacterSet characterSetWithCharactersInString:@"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-"];
+    if ([slug rangeOfCharacterFromSet:[allowed invertedSet]].location != NSNotFound) return nil;
+    return slug;
+}
+
 static void sendAllBytes(int fd, const void *buf, size_t len) {
     size_t sent = 0;
     while (sent < len) {
@@ -206,7 +221,7 @@ static void handleWebClient(int cfd) {
             return;
         }
 
-        // ---- 2. Web Studio HTML UI ----
+        // ---- 2. Web Studio HTML UI & Standalone Companion App Web Pages ----
         if ([method isEqualToString:@"GET"] && ([path isEqualToString:@"/"] || [path isEqualToString:@"/index.html"])) {
             NSString *htmlPath = [@TAPCORE_WEB_DIR stringByAppendingPathComponent:@"index.html"];
             NSData *html = [NSData dataWithContentsOfFile:htmlPath];
@@ -215,6 +230,48 @@ static void handleWebClient(int cfd) {
             } else {
                 const char *msg = "<h1>TapCore Web UI missing</h1><p>Expected /var/jb/usr/share/tapcore/web/index.html</p>";
                 sendResponse(cfd, 404, "Not Found", "text/html; charset=utf-8", msg, strlen(msg));
+            }
+            return;
+        }
+        if ([method isEqualToString:@"GET"] && [path hasPrefix:@"/app/"]) {
+            NSString *slug = [path substringFromIndex:5];
+            while ([slug hasSuffix:@"/"]) slug = [slug substringToIndex:slug.length - 1];
+            slug = safeAppSlug(slug);
+            if (!slug) { sendJSON(cfd, 400, @{@"error": @"Invalid app name"}); return; }
+            NSString *htmlPath = [[@TAPCORE_WEB_DIR stringByAppendingPathComponent:slug] stringByAppendingString:@".html"];
+            NSData *html = [NSData dataWithContentsOfFile:htmlPath];
+            if (html) {
+                sendResponse(cfd, 200, "OK", "text/html; charset=utf-8", html.bytes, html.length);
+            } else {
+                sendJSON(cfd, 404, @{@"error": @"App web UI not installed", @"app": slug});
+            }
+            return;
+        }
+
+        // ---- 2.5 Generic JSON/Data store for companion apps & standalone Lua scripts ----
+        if ([path isEqualToString:@"/api/data"]) {
+            NSString *name = safeDataName(query[@"name"]);
+            if (!name) { sendJSON(cfd, 400, @{@"success": @NO, @"error": @"Invalid data filename"}); return; }
+            NSString *dataDir = @TAPCORE_DATA_DIR;
+            [fm createDirectoryAtPath:dataDir withIntermediateDirectories:YES attributes:nil error:nil];
+            NSString *full = [dataDir stringByAppendingPathComponent:name];
+            if ([method isEqualToString:@"GET"]) {
+                NSData *d = [NSData dataWithContentsOfFile:full];
+                if (!d) { sendJSON(cfd, 404, @{@"success": @NO, @"error": @"Not found"}); return; }
+                const char *ct = [name.lowercaseString hasSuffix:@".json"] ? "application/json; charset=utf-8" : "text/plain; charset=utf-8";
+                sendResponse(cfd, 200, "OK", ct, d.bytes, d.length);
+            } else if ([method isEqualToString:@"POST"]) {
+                if (body.length > 2 * 1024 * 1024) {
+                    sendJSON(cfd, 400, @{@"success": @NO, @"error": @"Data exceeds 2MB limit"});
+                    return;
+                }
+                BOOL ok = [body writeToFile:full atomically:YES];
+                sendJSON(cfd, ok ? 200 : 500, @{@"success": @(ok), @"name": name, @"size": @(body.length)});
+            } else if ([method isEqualToString:@"DELETE"]) {
+                BOOL ok = [fm removeItemAtPath:full error:nil];
+                sendJSON(cfd, ok ? 200 : 404, @{@"success": @(ok)});
+            } else {
+                sendJSON(cfd, 400, @{@"success": @NO, @"error": @"Unsupported method"});
             }
             return;
         }
@@ -543,6 +600,29 @@ static void handleWebClient(int cfd) {
                 @"events": @(tapcore_recorder_event_count()),
                 @"lua": tapcore_recorder_current_lua() ?: @""
             });
+            return;
+        }
+
+        // ---- 10. Crane Backup + Panel Upload Pipeline ----
+        if ([method isEqualToString:@"POST"] && [path isEqualToString:@"/api/backup_upload"]) {
+            id parsed = body.length ? [NSJSONSerialization JSONObjectWithData:body options:0 error:nil] : nil;
+            if (![parsed isKindOfClass:[NSDictionary class]]) {
+                sendJSON(cfd, 400, @{@"ok": @NO, @"error": @"JSON body required"});
+                return;
+            }
+            NSDictionary *params = (NSDictionary *)parsed;
+            BOOL isAsync = [params[@"async"] boolValue]
+                || [query[@"async"] isEqualToString:@"1"]
+                || [[query[@"async"] lowercaseString] isEqualToString:@"true"];
+            NSDictionary *res = tapcore_backup_upload_start(params, !isAsync);
+            int code = (!isAsync && ![res[@"ok"] boolValue] && !res[@"job_id"]) ? 400 : 200;
+            sendJSON(cfd, code, res);
+            return;
+        }
+        if ([method isEqualToString:@"GET"] && [path isEqualToString:@"/api/backup_upload/status"]) {
+            NSDictionary *res = tapcore_backup_upload_status(query[@"job_id"]);
+            int code = [res[@"state"] isEqualToString:@"not_found"] ? 404 : 200;
+            sendJSON(cfd, code, res);
             return;
         }
 

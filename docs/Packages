@@ -18,6 +18,26 @@ MD5sum: 0b3c13b4461305ef13fa4b593f01c132
 SHA1: 7fccd8aeeab06fb45b3cbce1408c3d7ed910f555
 SHA256: 7fa1ee3ee3d303ddef1c95ea061cdfb2abe7b65d6f2d99b38843a01002d76e25
 
+Package: com.langtoi.igreg
+Name: IGReg
+Version: 1.0.5
+Architecture: iphoneos-arm64
+Priority: optional
+Section: Utilities
+Maintainer: Langtoi
+Author: Langtoi
+Homepage: https://github.com/langtoi/tapcore
+Depends: firmware (>= 15.0), com.tapcore (>= 1.2.0)
+Installed-Size: 540
+Description: Standalone Instagram auto-registration app powered by TapCore.
+ Run Tao_IG.xml account creation autonomously on iPhone with PC turned off,
+ configure proxies from Web UI (:8080/app/igreg), and reload XML updates anytime.
+Filename: debs/com.langtoi.igreg_1.0.5_iphoneos-arm64.deb
+Size: 111234
+MD5sum: f2b714dbc8a26b8808fd9a3995571db5
+SHA1: ef8ffe27b13021f9cdf029b90f467dff2cdbd2bf
+SHA256: dda2af17efd28b1d2a7f95c2596e3ddee5bb424d1e66acf0fb019f86a3b45fc9
+
 Package: com.langtoi.iostoolkit
 Name: Langtoi iOS Toolkit
 Version: 1.5.22
@@ -42,7 +62,7 @@ SHA256: 4b250618c8cbf6bed87b134fd38350d8c3ace16047065c58bf8ec2fae0b83d1b
 
 Package: com.tapcore
 Name: TapCore
-Version: 1.1.3
+Version: 1.2.2
 Architecture: iphoneos-arm64
 Description: Lightweight Lua automation runtime for rootless iOS 15-16: HID touch/keys, screen color, fast Vision OCR, findImage, touch recorder, web studio and app.
 Maintainer: langtoi
@@ -52,10 +72,10 @@ Depends: firmware (>= 15.0)
 Homepage: https://github.com/langtoi/tapcore
 Icon: https://langtoi.github.io/tapcore/icon-512.png
 Depiction: https://langtoi.github.io/tapcore/
-Installed-Size: 696
-Filename: debs/com.tapcore_1.1.3_iphoneos-arm64.deb
-Size: 245620
-MD5sum: 48385b21562a1c14b2aa4da1c78dc104
-SHA1: 7c0cfe639e21fb63afc0cf1119aaca7c07f3543e
-SHA256: 45721c7d074c8019d3fef0a69ecdbc6290fbae965b5af51861a4aeaa8a934266
+Installed-Size: 848
+Filename: debs/com.tapcore_1.2.2_iphoneos-arm64.deb
+Size: 283958
+MD5sum: 626ababa0e9fb8242f31b61a3edbaca3
+SHA1: 4a9b19126d5bbeb60bb9b8b0f189f89ae9c068e7
+SHA256: e0b3bf9b805d4fea0857d22bcd52d7b4a6392449d8ed036ed648bf856f209d5a
 

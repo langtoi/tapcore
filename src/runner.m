@@ -31,7 +31,9 @@ static void ensureDir(const char *path) {
 void tapcore_runner_load_config(void) {
     @autoreleasepool {
         ensureDir(TAPCORE_CONFIG_DIR);
+        ensureDir(TAPCORE_DATA_DIR);
         ensureDir(TAPCORE_WEB_DIR);
+        ensureDir(TAPCORE_LIB_DIR);
 
         NSMutableDictionary *def = [@{
             @"auto_start_script": @"",
@@ -139,20 +141,34 @@ static void *scriptWorkerMain(void *arg) {
 
         luaL_openlibs(L);
 
-        // Preload socket and json
+        // Preload socket, json, and http + add TAPCORE_LIB_DIR & scripts_dir to package.path
         lua_getglobal(L, "package");
         lua_getfield(L, -1, "preload");
         lua_pushcfunction(L, luaopen_tapcore_socket);
         lua_setfield(L, -2, "socket");
         lua_pushcfunction(L, luaopen_tapcore_json);
         lua_setfield(L, -2, "json");
-        lua_pop(L, 2);
+        lua_pushcfunction(L, luaopen_tapcore_http);
+        lua_setfield(L, -2, "http");
+        lua_pop(L, 1); // pop preload
+
+        lua_getfield(L, -1, "path");
+        const char *curPath = lua_tostring(L, -1);
+        NSString *extraPath = [NSString stringWithFormat:@"%s/?.lua;%@/?.lua;%s",
+                               TAPCORE_LIB_DIR,
+                               tapcore_scripts_dir() ?: @TAPCORE_SCRIPTS_DIR,
+                               curPath ?: ""];
+        lua_pop(L, 1);
+        lua_pushstring(L, extraPath.UTF8String);
+        lua_setfield(L, -2, "path");
+        lua_pop(L, 1); // pop package
 
         // Override print -> live log buffer
         lua_pushcfunction(L, l_tapcore_print);
         lua_setglobal(L, "print");
 
         tapcore_core_register_lua(L);
+        tapcore_http_register_lua(L);
         lua_sethook(L, luaStopHook, LUA_MASKCOUNT, 250);
 
         tapcore_log("RUN", "Started %s", fullPath.lastPathComponent.UTF8String);
