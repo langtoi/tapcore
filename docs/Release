@@ -6,14 +6,14 @@ Codename: ios
 Architectures: iphoneos-arm64
 Components: main
 Description: TapCore - lightweight Lua automation for rootless iOS
-Date: Fri, 27 Nov 2026 00:42:44 UTC
+Date: Fri, 27 Nov 2026 00:59:20 UTC
 MD5Sum:
- 74f047951770cc7a6cf6eb09a0e7bfc0 2717 Packages
- a5f357b1642119bd035966e50b69fd8b 1170 Packages.gz
- 1ca018d28add0087bfd565cbe48d57e3 1278 Packages.bz2
- 43870c9750750f9f439759efe865f5b7 1240 Packages.xz
+ 8fcaf19e2b794219899a8a57fefbe6ac 2741 Packages
+ e01c08898cddb06e550bb586fb7894da 1175 Packages.gz
+ f6e6b6c3c80a995439fda8072efa1ad0 1289 Packages.bz2
+ 02c03d8b1242ac5015bbc279b8f8259e 1248 Packages.xz
 SHA256:
- c713fb323be51af07ced600b58fe58dd36db16c92cc0c718f18387686f72507a 2717 Packages
- df49593bb818d8ea6c3fa04ef9dad8d6d7dbd1e6f88d26bbad6957e1ea962006 1170 Packages.gz
- ac033ee6f805a2c86d552e0576a7d20cca7b507cc93e3ad5c30d43965e7f13cc 1278 Packages.bz2
- a879b1472c1a532e64f2af32b1dfa9c29043f373070f1fbbe0ae45f897d272be 1240 Packages.xz
+ c590e2e09e0cb5fb9a57849874c5b13f173cc489f44505db5924ace12ec20386 2741 Packages
+ b1960191cc14ddc346f0cc72ca2950d30f7acc8c00eb61b7b51d35d653ae8d55 1175 Packages.gz
+ a491b9db98de449da62cfa2d3711cb93a028c8a4dd95ad6d3c61fbd93683b9ce 1289 Packages.bz2
+ 785997fa5adc34f60d07540b4747e8ed374520fef49150bf636a398fa39c418e 1248 Packages.xz
