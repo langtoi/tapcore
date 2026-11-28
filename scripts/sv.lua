@@ -805,6 +805,8 @@ local function processSearch(client, data)
     if data.text then
         local word   = trim(tostring(data.text)):lower()
         local target = word:gsub("%s+", "")
+        -- Apple Vision OCR frequently drops or turns '_' / '.' / '-' in usernames into spaces.
+        local normTarget = target:gsub("[_%.%-,]+", "")
         -- ex = true/omitted: OCR text equals or ENDS WITH target; ex = false: contains target
         local exact  = data.ex == nil or data.ex == true
         -- "level": "auto" (default) = Fast passes with an occasional Accurate fallback;
@@ -813,6 +815,14 @@ local function processSearch(client, data)
         local started, lastAccurate = now(), -math.huge
         local willTouch = data.action == "hold" or
             (type(data.action) == "string" and data.action:match("^click%d*$") ~= nil)
+
+        local function matchCandidate(candidate, tgt)
+            if #tgt == 0 then return false end
+            if exact then
+                return candidate:sub(-#tgt) == tgt
+            end
+            return candidate:find(tgt, 1, true) ~= nil
+        end
 
         -- One OCR pass: returns {x, y} of the target or nil, plus the level used.
         local function locate(deadline)
@@ -831,17 +841,26 @@ local function processSearch(client, data)
                 correct = (level == "accurate"), region = region})
             if ok and level == "accurate" then ocrAccurateCost = math.max(1, now() - t0) end
             if not ok or type(results) ~= "table" then return nil, level end
+
+            local chosen = nil
             for _, item in ipairs(results) do
                 local text = item.text or ""
                 local candidate = trim(text):lower():gsub("%s+", "")
-                local match
-                if exact then
-                    match = candidate:sub(-#target) == target
-                else
-                    match = candidate:find(target, 1, true) ~= nil
+                if matchCandidate(candidate, target) then
+                    chosen = item
+                    break
                 end
-                local r = item.rectangle
-                if match and r and r.topLeft and r.topRight and r.bottomLeft then
+                if not chosen and #normTarget > 0 then
+                    local normCandidate = candidate:gsub("[_%.%-,]+", "")
+                    if matchCandidate(normCandidate, normTarget) then
+                        chosen = item
+                    end
+                end
+            end
+            if chosen then
+                local text = chosen.text or ""
+                local r = chosen.rectangle
+                if r and r.topLeft and r.topRight and r.bottomLeft then
                     -- Estimate the center of the target word inside the text line
                     local line = text:lower()
                     local s, e = line:find(word, 1, true)
