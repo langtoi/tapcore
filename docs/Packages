@@ -20,7 +20,7 @@ SHA256: 7fa1ee3ee3d303ddef1c95ea061cdfb2abe7b65d6f2d99b38843a01002d76e25
 
 Package: com.langtoi.igreg
 Name: IGReg
-Version: 1.0.8
+Version: 1.0.9
 Architecture: iphoneos-arm64
 Priority: optional
 Section: Utilities
@@ -28,15 +28,15 @@ Maintainer: Langtoi
 Author: Langtoi
 Homepage: https://github.com/langtoi/tapcore
 Depends: firmware (>= 15.0), com.tapcore (>= 1.2.0)
-Installed-Size: 560
+Installed-Size: 552
 Description: Standalone Instagram auto-registration app powered by TapCore.
  Run Tao_IG.xml account creation autonomously on iPhone with PC turned off,
  configure proxies from Web UI (:8080/app/igreg), and reload XML updates anytime.
-Filename: debs/com.langtoi.igreg_1.0.8_iphoneos-arm64.deb
-Size: 114454
-MD5sum: 4f1d97416fd29a1aef537ca6dac86ac7
-SHA1: 47b0e77ff5c9858f8fb49beec5d01d552e82635d
-SHA256: 1e59dde1dbe1860911e8c30e09e3b290f0873622425c62947f7cfd025da3604c
+Filename: debs/com.langtoi.igreg_1.0.9_iphoneos-arm64.deb
+Size: 112702
+MD5sum: 014f87912003c512f7e4b3f5199efc53
+SHA1: f335d81b33f9b9568aba639024a6fdde8592599f
+SHA256: 25504947854f20a1dcf498ffef3f3c7116693e16c22512218e0187d9e98cc537
 
 Package: com.langtoi.iostoolkit
 Name: Langtoi iOS Toolkit
