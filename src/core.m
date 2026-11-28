@@ -294,6 +294,16 @@ int tapcore_core_init(void) {
         if (nw) { CFNumberGetValue(nw, kCFNumberDoubleType, &w); CFRelease(nw); }
         if (nh) { CFNumberGetValue(nh, kCFNumberDoubleType, &h_px); CFRelease(nh); }
     }
+    // iPhone Plus models (6/6s/7/8 Plus) report physical panel 1080x1920 via MobileGestalt,
+    // while CARenderServerRenderDisplay renders the @3x UIKit backing framebuffer (1242x2208).
+    // Keep g_screenW/H aligned with the rendered framebuffer so captures are unclipped and HID normalization matches.
+    if ((int)w == 1080 && (int)h_px == 1920) {
+        w = 1242.0;
+        h_px = 2208.0;
+    } else if ((int)w == 1920 && (int)h_px == 1080) {
+        w = 2208.0;
+        h_px = 1242.0;
+    }
     g_screenW = (int)w;
     g_screenH = (int)h_px;
 
