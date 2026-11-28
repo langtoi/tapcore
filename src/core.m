@@ -1567,6 +1567,12 @@ static int l_clearSystemAlbum(lua_State *L) {
     return 0;
 }
 
+static int l_getScreenSize(lua_State *L) {
+    lua_pushinteger(L, g_screenW);
+    lua_pushinteger(L, g_screenH);
+    return 2;
+}
+
 // ---------------- Register the native API into Lua ----------------
 void tapcore_core_register_lua(lua_State *L) {
     static const luaL_Reg globals[] = {
@@ -1587,6 +1593,7 @@ void tapcore_core_register_lua(lua_State *L) {
         {"openURL",           l_openURL},
         {"rootDir",           l_rootDir},
         {"appKill",           l_appKill},
+        {"getScreenSize",     l_getScreenSize},
         {"saveToSystemAlbum", l_saveToSystemAlbum},
         {"saveImageToAlbum",  l_saveToSystemAlbum},
         {"saveToAlbum",       l_saveToSystemAlbum},

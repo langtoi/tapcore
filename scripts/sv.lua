@@ -30,6 +30,46 @@ local TAP_HOLD_US     = 40000   -- finger-down time of a tap (a real tap lasts 4
 local TOUCH_SETTLE_US = 50000
 local POLL_INTERVAL_S = 0.03    -- pause between two color checks
 
+-- Auto-scale coordinates from iPhone X (1125x2436) to current device (e.g. iPhone 8 Plus 1080x1920)
+local REF_W, REF_H = 1125, 2436
+local DEV_W, DEV_H = REF_W, REF_H
+if type(getScreenSize) == "function" then
+    local ok, sw, sh = pcall(getScreenSize)
+    if ok and tonumber(sw) and tonumber(sh) and tonumber(sw) > 0 and tonumber(sh) > 0 then
+        DEV_W, DEV_H = tonumber(sw), tonumber(sh)
+    end
+end
+local SCALE_X = DEV_W / REF_W
+local SCALE_Y = DEV_H / REF_H
+
+local function scaleX(x)
+    local n = tonumber(x) or 0
+    if DEV_W == REF_W then return n end
+    local v = n * SCALE_X
+    if v < 0 then v = 0 elseif v > DEV_W - 1 then v = DEV_W - 1 end
+    return v
+end
+
+local function scaleY(y)
+    local n = tonumber(y) or 0
+    if DEV_H == REF_H then return n end
+    local v = n * SCALE_Y
+    if v < 0 then v = 0 elseif v > DEV_H - 1 then v = DEV_H - 1 end
+    return v
+end
+
+local function scaleRegion(reg)
+    if type(reg) ~= "table" or #reg < 4 then return reg end
+    if DEV_W == REF_W and DEV_H == REF_H then return reg end
+    local x = math.floor(scaleX(reg[1]) + 0.5)
+    local y = math.floor(scaleY(reg[2]) + 0.5)
+    local w = math.max(1, math.floor((tonumber(reg[3]) or 1) * SCALE_X + 0.5))
+    local h = math.max(1, math.floor((tonumber(reg[4]) or 1) * SCALE_Y + 0.5))
+    if x + w > DEV_W then w = math.max(1, DEV_W - x) end
+    if y + h > DEV_H then h = math.max(1, DEV_H - y) end
+    return {x, y, w, h}
+end
+
 -- Text search (Vision OCR). Measured on iPhone X: a Fast pass takes ~0.1 s, an Accurate pass
 -- ~2-4 s whatever the region size. So text search runs Fast passes, and only when Fast keeps
 -- missing does it spend one Accurate pass, if enough of the timeout is left for it.
@@ -469,8 +509,8 @@ local function normalizeColorsFromData(data)
     end
     if parsed.sample then
         local sampleColor = toNumber(parsed.sample.color)
-        local sampleX = toNumber(parsed.sample.x)
-        local sampleY = toNumber(parsed.sample.y)
+        local sampleX = scaleX(toNumber(parsed.sample.x))
+        local sampleY = scaleY(toNumber(parsed.sample.y))
         if not sampleColor or sampleColor % 1 ~= 0 or sampleColor < 0 or sampleColor > 0xFFFFFF
             or not sampleX or not sampleY then
             return nil, nil, "Invalid sampled color coordinate"
@@ -479,6 +519,7 @@ local function normalizeColorsFromData(data)
             return nil, nil, "Sampled color does not match findColor color"
         end
         if options.region then
+            options.region = scaleRegion(options.region)
             local r = options.region
             if sampleX < r[1] or sampleY < r[2]
                 or sampleX >= r[1] + r[3] or sampleY >= r[2] + r[4] then
@@ -486,6 +527,8 @@ local function normalizeColorsFromData(data)
             end
         end
         options.sample = {color = sampleColor, x = sampleX, y = sampleY}
+    elseif options.region then
+        options.region = scaleRegion(options.region)
     end
     return colors, options
 end
@@ -595,7 +638,7 @@ local function parsePoints(data)
         if not c or c % 1 ~= 0 or c < 0 or c > 0xFFFFFF or not x or not y or x < 0 or y < 0 then
             return nil, "Invalid point " .. i .. ": need color 0x000000-0xFFFFFF and x, y >= 0"
         end
-        points[i] = {color = c, x = x, y = y}
+        points[i] = {color = c, x = scaleX(x), y = scaleY(y)}
         if c ~= points[1].color then distinct = true end
     end
     if not distinct then
@@ -700,8 +743,14 @@ local function processCommand(client, data, action)
         ok = called and typed ~= false
         res.message = ok and "Text input" or ("Text failed: " .. tostring(how or typed))
     else -- RUNLUA
+        local runEnv = setmetatable({
+            touchDown = function(id, x, y) return touchDown(id, scaleX(x), scaleY(y)) end,
+            touchMove = function(id, x, y) return touchMove(id, scaleX(x), scaleY(y)) end,
+            touchUp   = function(id, x, y) return touchUp(id, scaleX(x), scaleY(y)) end,
+            tap       = function(x, y) return tap(scaleX(x), scaleY(y)) end,
+        }, { __index = _G })
         ok, result = pcall(function()
-            local fn, compileError = load(payload)
+            local fn, compileError = load(payload, "runlua", "t", runEnv)
             if not fn then error("Compile failed: " .. tostring(compileError), 0) end
             return fn()
         end)
@@ -730,6 +779,7 @@ local function processSearch(client, data)
     local timeout = toNumber(data.timeout) or 15
     local region, regionError = normalizeRegion(data.region)
     if regionError then return fail(client, 400, regionError) end
+    region = scaleRegion(region)
     local dx = toNumber(data.offsetX) or 0
     local dy = (toNumber(data.offsetY) or 0) + (toNumber(data.offset) or 0)
 
