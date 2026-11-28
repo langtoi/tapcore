@@ -40,7 +40,7 @@ SHA256: 1e59dde1dbe1860911e8c30e09e3b290f0873622425c62947f7cfd025da3604c
 
 Package: com.langtoi.iostoolkit
 Name: Langtoi iOS Toolkit
-Version: 1.5.22
+Version: 1.5.23
 Architecture: iphoneos-arm64
 Priority: optional
 Section: Utilities
@@ -51,14 +51,13 @@ Replaces: com.langtoi.igghostguard, com.langtoi.threadsghostguard, com.langtoi.r
 Provides: com.langtoi.igghostguard, com.langtoi.threadsghostguard, com.langtoi.redditghostguard, com.langtoi.threadscookie
 Conflicts: com.langtoi.igghostguard, com.langtoi.threadsghostguard, com.langtoi.redditghostguard, com.langtoi.autotouchalertfilter, com.langtoi.threadscookie
 Depends: firmware (>= 15.0), com.opa334.crane (>= 1.3.17), ellekit | mobilesubstrate, python3, sudo, curl, uikittools, shell-cmds, system-cmds, zip, unzip, ldid
-Installed-Size: 2059
 Description: Rootless toolkit for Crane, Ghost and X container switching.
  Includes x-container, crane-restore, ghost guards and session sync tools.
-Filename: debs/com.langtoi.iostoolkit_1.5.22_iphoneos-arm64.deb
-Size: 372466
-MD5sum: aa26f396b5db6debf029a7ec241fde19
-SHA1: e21186402bb12e37bb5ee56abcc98d0757a7d568
-SHA256: 4b250618c8cbf6bed87b134fd38350d8c3ace16047065c58bf8ec2fae0b83d1b
+Filename: debs/com.langtoi.iostoolkit_1.5.23_iphoneos-arm64.deb
+Size: 267166
+MD5sum: 666d8821e6665839dfb565660e2bf17e
+SHA1: 11548082aa34a0f1d3c18e046a9f9fd25378d8fd
+SHA256: 158d4fb884a2623f0269665067328ab302ddf299adb893a8182c907dd04c5461
 
 Package: com.tapcore
 Name: TapCore
