@@ -50,6 +50,7 @@ void          tapcore_exec_swipe(double x1, double y1, double x2, double y2, int
 void          tapcore_exec_home(void);
 BOOL          tapcore_exec_text(const char *s, size_t len, char *how, size_t howLen);
 BOOL          tapcore_copy_text(const char *s, size_t len, char *how, size_t howLen);
+BOOL          tapcore_set_date(const char *s, size_t len, char *how, size_t howLen);
 
 // Touch Recorder (IOKit HID event callback)
 int       tapcore_recorder_start(void);

@@ -742,6 +742,10 @@ local function processCommand(client, data, action)
         local called, typed, how = pcall(inputText, payload)
         ok = called and typed ~= false
         res.message = ok and "Text input" or ("Text failed: " .. tostring(how or typed))
+    elseif action == "DATE" then
+        local called, setOk, how = pcall(setDate, tostring(payload or "random"))
+        ok = called and setOk ~= false
+        res.message = ok and tostring(how or "Date set") or ("Date failed: " .. tostring(how or setOk))
     else -- RUNLUA
         local runEnv = setmetatable({
             touchDown = function(id, x, y) return touchDown(id, scaleX(x), scaleY(y)) end,
@@ -973,7 +977,7 @@ local function handleRequest(client)
         respond(client, 200, {success = true, message = "Server stopped"})
         return "STOP"
     end
-    if action == "RUNLUA" or action == "URL" or action == "TEXT" then
+    if action == "RUNLUA" or action == "URL" or action == "TEXT" or action == "DATE" then
         return processCommand(client, data, action)
     elseif action == "COLOR" or action == "FINDCOLOR" or action == "FINDCOLORS" then
         return processColor(client, data)

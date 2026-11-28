@@ -736,6 +736,21 @@ BOOL tapcore_copy_text(const char *s, size_t len, char *how, size_t howLen) {
     return NO;
 }
 
+BOOL tapcore_set_date(const char *s, size_t len, char *how, size_t howLen) {
+    const char *spec = (s && len > 0) ? s : "random";
+    size_t specLen = (s && len > 0) ? len : strlen("random");
+    if (dispatchTweakCommand("setdate", spec, specLen, 500)) {
+        char info[160];
+        copyAckInfo(info, sizeof(info));
+        snprintf(how, howLen, "%s", info);
+        tapcore_log("INP", "setDate(%.*s) via %s", (int)specLen, spec, info);
+        return YES;
+    }
+    snprintf(how, howLen, "no active UIDatePicker answered");
+    tapcore_log("INP", "setDate(%.*s) failed: no active UIDatePicker answered", (int)specLen, spec);
+    return NO;
+}
+
 // inputText(str) -> true, how | false, reason
 static int l_inputText(lua_State *L) {
     size_t len = 0;
@@ -1577,6 +1592,18 @@ static int l_clearSystemAlbum(lua_State *L) {
     return 0;
 }
 
+// setDate([yyyy_mm_dd_or_random]) -> true, info | false, reason
+static int l_setDate(lua_State *L) {
+    size_t len = 0;
+    const char *s = lua_isstring(L, 1) ? lua_tolstring(L, 1, &len) : "random";
+    if (!s || len == 0) { s = "random"; len = strlen("random"); }
+    char how[200];
+    BOOL ok = tapcore_set_date(s, len, how, sizeof(how));
+    lua_pushboolean(L, ok);
+    lua_pushstring(L, how);
+    return 2;
+}
+
 static int l_getScreenSize(lua_State *L) {
     lua_pushinteger(L, g_screenW);
     lua_pushinteger(L, g_screenH);
@@ -1594,6 +1621,7 @@ void tapcore_core_register_lua(lua_State *L) {
         {"keyUp",             l_keyUp},
         {"inputText",         l_inputText},
         {"copyText",          l_copyText},
+        {"setDate",           l_setDate},
         {"getColor",          l_getColor},
         {"getColors",         l_getColors},
         {"findColors",        l_findColors},

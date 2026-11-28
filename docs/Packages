@@ -20,7 +20,7 @@ SHA256: 7fa1ee3ee3d303ddef1c95ea061cdfb2abe7b65d6f2d99b38843a01002d76e25
 
 Package: com.langtoi.igreg
 Name: IGReg
-Version: 1.0.9
+Version: 1.0.10
 Architecture: iphoneos-arm64
 Priority: optional
 Section: Utilities
@@ -28,15 +28,15 @@ Maintainer: Langtoi
 Author: Langtoi
 Homepage: https://github.com/langtoi/tapcore
 Depends: firmware (>= 15.0), com.tapcore (>= 1.2.0)
-Installed-Size: 552
+Installed-Size: 548
 Description: Standalone Instagram auto-registration app powered by TapCore.
  Run Tao_IG.xml account creation autonomously on iPhone with PC turned off,
  configure proxies from Web UI (:8080/app/igreg), and reload XML updates anytime.
-Filename: debs/com.langtoi.igreg_1.0.9_iphoneos-arm64.deb
-Size: 112702
-MD5sum: 014f87912003c512f7e4b3f5199efc53
-SHA1: f335d81b33f9b9568aba639024a6fdde8592599f
-SHA256: 25504947854f20a1dcf498ffef3f3c7116693e16c22512218e0187d9e98cc537
+Filename: debs/com.langtoi.igreg_1.0.10_iphoneos-arm64.deb
+Size: 111448
+MD5sum: 3aaa5b150669906db236b31f015958fc
+SHA1: 8f4f4313ef4fa95d49c9b12232034b374adfdf3d
+SHA256: eb77b982736adfbee7831e5c6c931bf6b44e9e91268db2cd8e9f3c44414b89c1
 
 Package: com.langtoi.iostoolkit
 Name: Langtoi iOS Toolkit
@@ -61,7 +61,7 @@ SHA256: 3c35be6facb4f57199a99f2a5d58407df40c91f047a88460e51edcc3e79154b3
 
 Package: com.tapcore
 Name: TapCore
-Version: 1.2.8
+Version: 1.2.9
 Architecture: iphoneos-arm64
 Description: Lightweight Lua automation runtime for rootless iOS 15-16: HID touch/keys, screen color, fast Vision OCR, findImage, touch recorder, web studio and app.
 Maintainer: langtoi
@@ -71,10 +71,10 @@ Depends: firmware (>= 15.0)
 Homepage: https://github.com/langtoi/tapcore
 Icon: https://langtoi.github.io/tapcore/icon-512.png
 Depiction: https://langtoi.github.io/tapcore/
-Installed-Size: 772
-Filename: debs/com.tapcore_1.2.8_iphoneos-arm64.deb
-Size: 275436
-MD5sum: 19ebe913af4d5a19e7cc5be7940d3c89
-SHA1: 17234c037139c98fc0e70e866c795b7bfb47ed90
-SHA256: 5efb4f5e99a44cf61fc0701925b1d4154a6152c5b2468feea9adaf18ae00ab6e
+Installed-Size: 872
+Filename: debs/com.tapcore_1.2.9_iphoneos-arm64.deb
+Size: 290740
+MD5sum: 8ccdbd20817845b1a1a90bde6638c7ad
+SHA1: 7afb7391db42ebd3bcf9abf453e0df5e0c1c4641
+SHA256: 6d01f4ea514e1d6909bff2c9bb621e54b66ae663b8e9739faadf6dad5002d18a
 
